@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: shortner-postgres
+
+    environment:
+      POSTGRES_DB: shortner
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 12345678
+
+    ports:
+      - "5433:5432"
+
+  redis:
+    image: redis:7
+    container_name: shortner-redis
+
+    ports:
+      - "6379:6379"
