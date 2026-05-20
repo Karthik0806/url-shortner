@@ -1,5 +1,5 @@
 spring:
   application:
-    name: url-shortner
+    name: url-shortener
   profiles:
     active: dev

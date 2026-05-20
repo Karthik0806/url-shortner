@@ -1,0 +1,2237 @@
+package com.karthik.urlshortener.admin;
+
+import jakarta.persistence.PrePersist;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/admin")
+@RequiredArgsConstructor
+public class AdminController {
+    @GetMapping("/health")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String adminHealth(){
+        return "Admin API Working (under development......)";
+    }
+}
+package com.karthik.urlshortener.analytics.controller;
+
+import com.karthik.urlshortener.analytics.dto.AnalyticsSummaryResponse;
+import com.karthik.urlshortener.analytics.service.AnalyticsService;
+import com.karthik.urlshortener.common.dto.ApiResponse;
+import com.karthik.urlshortener.url.entity.Url;
+import com.karthik.urlshortener.url.service.UrlService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/analytics")
+@RequiredArgsConstructor
+public class AnalyticsController {
+
+    private final AnalyticsService analyticsService;
+    private final UrlService urlService;
+
+    @GetMapping("/{shortCode}")
+    public ApiResponse<AnalyticsSummaryResponse> getAnalytics(
+            @PathVariable String shortCode) {
+
+        Url url = urlService.getOwnedUrlByShortCode(shortCode);
+
+        return ApiResponse.<AnalyticsSummaryResponse>builder()
+                .success(true)
+                .message("Analytics fetched successfully")
+                .data(analyticsService.getAnalytics(url))
+                .build();
+    }
+}package com.karthik.urlshortener.analytics.dto;
+
+import com.karthik.urlshortener.analytics.enums.DeviceType;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.Instant;
+
+@Getter
+@Setter
+@Builder
+public class AnalyticsResponse {
+
+    private String ipAddress;
+    private String browser;
+    private DeviceType device;
+    private String referer;
+    private Instant createdAt;
+}
+package com.karthik.urlshortener.analytics.dto;
+
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.util.List;
+
+@Getter
+@Setter
+@Builder
+public class AnalyticsSummaryResponse {
+
+    private String shortCode;
+    private String originalUrl;
+    private Long totalClicks;
+    private List<AnalyticsResponse> analytics;
+}
+package com.karthik.urlshortener.analytics.entity;
+
+import com.karthik.urlshortener.analytics.enums.DeviceType;
+import com.karthik.urlshortener.common.entity.BaseEntity;
+import com.karthik.urlshortener.url.entity.Url;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.Instant;
+
+@Entity
+@Table(name = "analytics")
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+public class Analytics extends BaseEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String ipAddress;
+    private String browser;
+    @Enumerated(EnumType.STRING)
+    private DeviceType device;
+    private String referer;
+
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "url_id")
+    private Url url;
+
+
+    
+}
+package com.karthik.urlshortener.analytics.enums;
+
+public enum DeviceType {
+    MOBILE,TABLET,DESKTOP,UNKNOWN
+}
+package com.karthik.urlshortener.analytics.repo;
+
+import com.karthik.urlshortener.analytics.entity.Analytics;
+import com.karthik.urlshortener.url.entity.Url;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+@Repository
+public interface AnalyticsRepo
+        extends JpaRepository<Analytics, Long> {
+
+    List<Analytics> findByUrl(
+            Url url
+    );
+}package com.karthik.urlshortener.analytics.service;
+
+import com.karthik.urlshortener.analytics.dto.AnalyticsResponse;
+import com.karthik.urlshortener.analytics.dto.AnalyticsSummaryResponse;
+import com.karthik.urlshortener.analytics.entity.Analytics;
+import com.karthik.urlshortener.analytics.enums.DeviceType;
+import com.karthik.urlshortener.analytics.repo.AnalyticsRepo;
+
+import com.karthik.urlshortener.common.exception.ForbiddenException;
+import com.karthik.urlshortener.security.entity.CustomUserDetails;
+import com.karthik.urlshortener.url.entity.Url;
+import com.karthik.urlshortener.url.repository.UrlRepo;
+import com.karthik.urlshortener.user.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class AnalyticsService {
+
+    private final AnalyticsRepo analyticsRepo;
+
+    private final UrlRepo urlRepo;
+
+    private final UserService userService;
+
+    public void saveAnalytics(
+            Url url,
+            HttpServletRequest request
+    ) {
+
+        Analytics analytics = Analytics.builder()
+
+                .url(url)
+
+                .ipAddress(
+                        extractIpAddress(request)
+                )
+
+                .browser(
+                        extractBrowser(
+                                request.getHeader("User-Agent")
+                        )
+                )
+
+                .device(
+                        extractDevice(
+                                request.getHeader("User-Agent")
+                        )
+                )
+
+                .referer(
+                        request.getHeader("Referer")
+                )
+
+                .build();
+
+        analyticsRepo.save(analytics);
+
+        log.info(
+                "Analytics saved for shortCode: {}",
+                url.getShortCode()
+        );
+    }
+
+    public AnalyticsSummaryResponse getAnalytics(
+            Url url
+    ) {
+
+
+        // STEP 3: Fetch analytics
+        List<Analytics> analyticsList =
+                analyticsRepo.findByUrl(url);
+
+        // STEP 4: Build response
+        List<AnalyticsResponse> analyticsResponses =
+                analyticsList
+                        .stream()
+                        .map(analytics ->
+                                AnalyticsResponse.builder()
+
+                                        .ipAddress(
+                                                analytics.getIpAddress()
+                                        )
+
+                                        .browser(
+                                                analytics.getBrowser()
+                                        )
+
+                                        .device(
+                                                analytics.getDevice()
+                                        )
+
+                                        .referer(
+                                                analytics.getReferer()
+                                        )
+
+                                        .createdAt(
+                                                analytics.getCreatedAt()
+                                        )
+
+                                        .build()
+                        )
+                        .toList();
+
+        return AnalyticsSummaryResponse.builder()
+
+                .shortCode(
+                        url.getShortCode()
+                )
+
+                .originalUrl(
+                        url.getOriginalUrl()
+                )
+
+                .totalClicks(
+                        url.getClickCount()
+                )
+
+                .analytics(
+                        analyticsResponses
+                )
+
+                .build();
+    }
+
+    private String extractIpAddress(
+            HttpServletRequest request
+    ) {
+
+        String forwardedFor =
+                request.getHeader(
+                        "X-Forwarded-For"
+                );
+
+        if (forwardedFor != null &&
+                !forwardedFor.isBlank()) {
+
+            return forwardedFor
+                    .split(",")[0]
+                    .trim();
+        }
+
+        return request.getRemoteAddr();
+    }
+
+    private String extractBrowser(
+            String userAgent
+    ) {
+
+        if (userAgent == null) {
+
+            return "Unknown";
+        }
+
+        if (userAgent.contains("Chrome")) {
+
+            return "Chrome";
+        }
+
+        if (userAgent.contains("Firefox")) {
+
+            return "Firefox";
+        }
+
+        if (userAgent.contains("Safari")) {
+
+            return "Safari";
+        }
+
+        if (userAgent.contains("Edge")) {
+
+            return "Edge";
+        }
+
+        return "Unknown";
+    }
+
+    private DeviceType extractDevice(
+            String userAgent
+    ) {
+
+        if (userAgent == null) {
+
+            return DeviceType.UNKNOWN;
+        }
+
+        String lower =
+                userAgent.toLowerCase();
+
+        if (lower.contains("mobile")) {
+
+            return DeviceType.MOBILE;
+        }
+
+        if (lower.contains("tablet")) {
+
+            return DeviceType.TABLET;
+        }
+
+        return DeviceType.DESKTOP;
+    }
+}package com.karthik.urlshortener.auth.controller;
+
+import com.karthik.urlshortener.auth.dto.AuthResponse;
+import com.karthik.urlshortener.auth.dto.LoginRequest;
+import com.karthik.urlshortener.auth.dto.RefreshTokenRequest;
+import com.karthik.urlshortener.auth.dto.RegisterRequest;
+import com.karthik.urlshortener.auth.service.AuthService;
+import com.karthik.urlshortener.common.dto.ApiResponse;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/auth")
+@RequiredArgsConstructor
+public class AuthController {
+
+    private final AuthService authService;
+
+    @PostMapping("/register")
+    public ApiResponse<AuthResponse> register(
+            @Valid @RequestBody RegisterRequest request) {
+
+        return ApiResponse.<AuthResponse>builder()
+                .success(true)
+                .message("User registered successfully")
+                .data(authService.register(request))
+                .build();
+    }
+
+    @PostMapping("/login")
+    public ApiResponse<AuthResponse> login(
+            @Valid @RequestBody LoginRequest request) {
+
+        return ApiResponse.<AuthResponse>builder()
+                .success(true)
+                .message("Login successful")
+                .data(authService.login(request))
+                .build();
+    }
+
+    @PostMapping("/refresh")
+    public ApiResponse<AuthResponse> refreshToken(
+            @Valid @RequestBody RefreshTokenRequest request) {
+
+        return ApiResponse.<AuthResponse>builder()
+                .success(true)
+                .message("Token refreshed successfully")
+                .data(authService.refreshToken(request))
+                .build();
+    }
+
+    @PostMapping("/logout")
+    public ApiResponse<String> logout(
+            @RequestBody RefreshTokenRequest request) {
+
+        authService.logout(request);
+
+        return ApiResponse.<String>builder()
+                .success(true)
+                .message("Logout successful")
+                .data("Logged out successfully")
+                .build();
+    }
+}package com.karthik.urlshortener.auth.dto;
+
+import lombok.Builder;
+import lombok.Getter;
+
+@Getter
+@Builder
+public class AuthResponse {
+
+    private String accessToken;
+    private String refreshToken;
+    private String email;
+    private String username;
+}
+package com.karthik.urlshortener.auth.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class LoginRequest {
+
+    @Email(message = "Invalid email format")
+    @NotBlank(message = "Email cannot be empty")
+    private String email;
+    @NotBlank(message = "Password cannot be empty")
+    private String password;
+}
+package com.karthik.urlshortener.auth.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class RefreshTokenRequest {
+    @NotBlank(message = "Refresh token cannot be empty")
+    private String refreshToken;
+}package com.karthik.urlshortener.auth.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class RegisterRequest {
+    @NotBlank
+    @Size(min = 4, max = 50,message = "Username must be between 4 and 50 characters")
+    private String username;
+    @Email(message = "Invalid email format")
+    @NotBlank(message = "Email cannot be empty")
+    private String email;
+    @NotBlank
+    @Size(min = 8,max = 24,message = "Password must be between 8 and 24")
+    private String password;
+}
+package com.karthik.urlshortener.auth.entity;
+
+import com.karthik.urlshortener.user.entity.User;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.Instant;
+
+@Entity
+@Table
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class RefreshToken {
+    @Id
+    @GeneratedValue(strategy =  GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false,unique = true)
+    private String token;
+
+    @Column(nullable = false)
+    private Instant expiryDate;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
+}
+
+package com.karthik.urlshortener.auth.repo;
+
+import com.karthik.urlshortener.auth.entity.RefreshToken;
+import com.karthik.urlshortener.user.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface RefreshTokenRepo extends JpaRepository<RefreshToken,Long> {
+
+    Optional<RefreshToken> findByToken(String token);
+    void deleteByToken(String token);
+    void deleteByUser(User user);
+}
+package com.karthik.urlshortener.auth.service;
+
+import com.karthik.urlshortener.auth.dto.AuthResponse;
+import com.karthik.urlshortener.auth.dto.LoginRequest;
+import com.karthik.urlshortener.auth.dto.RefreshTokenRequest;
+import com.karthik.urlshortener.auth.dto.RegisterRequest;
+import com.karthik.urlshortener.auth.entity.RefreshToken;
+import com.karthik.urlshortener.common.exception.InvalidCredentialsException;
+import com.karthik.urlshortener.common.exception.UserAlreadyExistsException;
+import com.karthik.urlshortener.security.service.JwtService;
+import com.karthik.urlshortener.user.entity.User;
+import com.karthik.urlshortener.user.enums.Role;
+import com.karthik.urlshortener.user.repository.UserRepo;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final JwtService jwtService;
+    private final UserRepo userRepo;
+    private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
+
+    public AuthResponse register(RegisterRequest request){
+        if (userRepo.existsByEmail(request.getEmail())){
+            throw new UserAlreadyExistsException("Email already exists");
+        }
+        User user = User.builder()
+                .username(request.getUsername())
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role(Role.USER)
+                .build();
+        User savedUser = userRepo.save(user);
+        log.info("User registered successfully: {}", savedUser.getEmail());
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(savedUser);
+        return  AuthResponse.builder().accessToken(jwtService.generateAccessToken(savedUser.getEmail()))
+                .refreshToken(refreshToken.getToken())
+                .email(savedUser.getEmail())
+                .username(savedUser.getUsername())
+                .build();
+    }
+    public AuthResponse login(LoginRequest request){
+        log.info("Login attempt for email: {}", request.getEmail());
+        User user = userRepo.findByEmail(request.getEmail()).orElseThrow(()-> new InvalidCredentialsException("Invalid credentials"));
+        boolean passwordMatches =passwordEncoder.matches(request.getPassword(), user.getPassword());
+        if (!passwordMatches){
+            log.warn("Invalid login attempt for email: {}", request.getEmail());
+            throw new InvalidCredentialsException("Invalid credentials");
+        }
+        log.info("User logged in successfully: {}", user.getEmail());
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+        return AuthResponse.builder()
+                .accessToken(jwtService.generateAccessToken(user.getEmail()))
+                .refreshToken(refreshToken.getToken())
+                .email(user.getEmail())
+                .username(user.getUsername())
+                .build();
+
+    }
+    public AuthResponse refreshToken(RefreshTokenRequest request){
+        RefreshToken refreshToken = refreshTokenService.verifyRefreshToken(request.getRefreshToken());
+        User user = refreshToken.getUser();
+        String accessToken = jwtService.generateAccessToken(user.getEmail());
+        return AuthResponse.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshToken.getToken())
+                .email(user.getEmail())
+                .username(user.getUsername())
+                .build();
+    }
+    public void logout(RefreshTokenRequest request){
+        refreshTokenService.deleteRefreshToken(request.getRefreshToken());
+        log.info("User logged out successfully");
+    }
+}
+package com.karthik.urlshortener.auth.service;
+
+import com.karthik.urlshortener.auth.entity.RefreshToken;
+import com.karthik.urlshortener.auth.repo.RefreshTokenRepo;
+import com.karthik.urlshortener.common.exception.InvalidTokenException;
+import com.karthik.urlshortener.common.exception.RefreshTokenExpiredException;
+import com.karthik.urlshortener.security.service.JwtService;
+import com.karthik.urlshortener.user.entity.User;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class RefreshTokenService {
+    private final RefreshTokenRepo refreshTokenRepo;
+    private final JwtService jwtService;
+    @Value("${jwt.refresh-token-expiration}")
+    private long refreshTokenExpiration;
+
+    public RefreshToken createRefreshToken(User user){
+        refreshTokenRepo.deleteByUser(user);
+        String token = jwtService.generateRefreshToken(user.getEmail());
+        RefreshToken refreshToken = RefreshToken.builder()
+                .token(token)
+                .user(user)
+                .expiryDate(Instant.now().plusMillis(refreshTokenExpiration))
+                .build();
+
+        log.info("Refresh token created for user: {}", user.getEmail());
+        return refreshTokenRepo.save(refreshToken);
+    }
+    public RefreshToken verifyRefreshToken(String token){
+        RefreshToken refreshToken = refreshTokenRepo.findByToken(token)
+                .orElseThrow(()->new InvalidTokenException("Invalid refresh token"));
+
+        if (!jwtService.isTokenValid(token)){
+            throw new InvalidTokenException("Invalid refresh token");
+        }
+        if (refreshToken.getExpiryDate().isBefore(Instant.now())){
+            log.warn("Refresh token expired");
+            refreshTokenRepo.delete(refreshToken);
+            throw new RefreshTokenExpiredException("Refresh token expired");
+        }
+        return refreshToken;
+    }
+    public void deleteRefreshToken(String token){
+        refreshTokenRepo.deleteByToken(token);
+        log.info("Refresh token deleted successfully");
+    }
+}
+package com.karthik.urlshortener.common.config;
+
+import lombok.Getter;
+import lombok.Setter;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
+
+@Getter
+@Setter
+@Component
+@ConfigurationProperties(prefix = "app")
+public class AppProperties {
+
+    private String baseShortUrl;
+}package com.karthik.urlshortener.common.dto;
+
+import lombok.Builder;
+import lombok.Getter;
+
+import java.time.Instant;
+
+@Getter
+@Builder
+public class ApiResponse<T> {
+
+    private boolean success;
+    private String message;
+    private T data;
+
+    @Builder.Default
+    private Instant timestamp = Instant.now();
+}
+package com.karthik.urlshortener.common.entity;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.MappedSuperclass;
+import lombok.Getter;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.time.Instant;
+
+@Getter
+@MappedSuperclass
+@EntityListeners(AuditingEntityListener.class)
+public class BaseEntity {
+    @CreatedDate
+    @Column(nullable = false,updatable = false)
+    private Instant createdAt;
+
+    @LastModifiedDate
+    @Column(nullable = false)
+    private Instant updatedAt;
+}
+package com.karthik.urlshortener.common.exception;
+
+import com.karthik.urlshortener.common.dto.ApiResponse;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.HashMap;
+import java.util.Map;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleValidationErrors(MethodArgumentNotValidException ex) {
+
+        Map<String, String> errors = new HashMap<>();
+
+        ex.getBindingResult().getFieldErrors().forEach(error -> errors.put(error.getField(), error.getDefaultMessage()));
+
+        return ResponseEntity.badRequest().body(ApiResponse.<Map<String, String>>builder().success(false).message("Validation failed").data(errors).build());
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRateLimitExceededException(RateLimitExceededException ex) {
+
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(ApiResponse.<Void>builder().success(false).message(ex.getMessage()).build());
+    }
+
+    @ExceptionHandler(UrlNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUrlNotFound(UrlNotFoundException ex) {
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.<Void>builder().success(false).message(ex.getMessage()).build());
+    }
+
+    @ExceptionHandler(UserAlreadyExistsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUserAlreadyExists(UserAlreadyExistsException ex) {
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.<Void>builder().success(false).message(ex.getMessage()).build());
+    }
+
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUserNotFound(UserNotFoundException ex) {
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.<Void>builder().success(false).message(ex.getMessage()).build());
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidCredentials(InvalidCredentialsException ex) {
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.<Void>builder().success(false).message(ex.getMessage()).build());
+    }
+
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidToken(InvalidTokenException ex) {
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.<Void>builder().success(false).message(ex.getMessage()).build());
+    }
+
+    @ExceptionHandler(RefreshTokenExpiredException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRefreshTokenExpired(RefreshTokenExpiredException ex) {
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.<Void>builder().success(false).message(ex.getMessage()).build());
+    }
+
+    @ExceptionHandler(DuplicateAliasException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDuplicateAlias(DuplicateAliasException ex) {
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.<Void>builder().success(false).message(ex.getMessage()).build());
+    }
+
+    @ExceptionHandler(ReservedAliasException.class)
+    public ResponseEntity<ApiResponse<Void>> handleReservedAlias(ReservedAliasException ex) {
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.<Void>builder().success(false).message(ex.getMessage()).build());
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnauthorized(UnauthorizedException ex) {
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.<Void>builder().success(false).message(ex.getMessage()).build());
+    }
+
+    @ExceptionHandler(UrlExpiredException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUrlExpired(UrlExpiredException ex) {
+
+        return ResponseEntity.status(HttpStatus.GONE).body(ApiResponse.<Void>builder().success(false).message(ex.getMessage()).build());
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRuntimeException(RuntimeException ex) {
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.<Void>builder().success(false).message(ex.getMessage()).build());
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
+
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(ApiResponse.<Void>builder().success(false).message("Something went wrong").build());
+    }
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ApiResponse<Void>>
+    handleForbiddenException(
+            ForbiddenException ex
+    ) {
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(
+                        ApiResponse.<Void>builder()
+                                .success(false)
+                                .message(ex.getMessage())
+                                .build()
+                );
+    }
+}package com.karthik.urlshortener.common.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+
+import java.time.Duration;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class RateLimitService {
+
+    private static final long MAX_REQUESTS = 50;
+    private static final Duration WINDOW = Duration.ofMinutes(1);
+    private final StringRedisTemplate redisTemplate;
+
+    public boolean isAllowed(String ipAddress) {
+
+        String key = "rate_limit:" + ipAddress;
+
+        Long requests = redisTemplate.opsForValue().increment(key);
+
+        // FIRST REQUEST
+        if (requests != null && requests == 1) {
+
+            redisTemplate.expire(key, WINDOW);
+        }
+
+        boolean allowed = requests != null && requests <= MAX_REQUESTS;
+
+        if (!allowed) {
+
+            log.warn("Rate limit exceeded for IP: {}", ipAddress);
+        }
+
+        return allowed;
+    }
+}
+package com.karthik.urlshortener.common.util;
+
+public class Base62Encoder {
+    private static final String BASE62 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+    public static String encode(Long value){
+        if (value==0) return "a";
+        StringBuilder shortCode  =  new StringBuilder();
+        while (value>0){
+            int remainder = (int) (value%62);
+            shortCode.append(BASE62.charAt(remainder));
+            value/=62;
+        }
+        return shortCode.reverse().toString();
+    }
+}
+package com.karthik.urlshortener.config;
+
+import com.karthik.urlshortener.user.entity.User;
+import com.karthik.urlshortener.user.enums.Role;
+
+import com.karthik.urlshortener.user.repository.UserRepo;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class AdminSeeder implements CommandLineRunner {
+
+    private final UserRepo userRepo;
+
+    private final PasswordEncoder passwordEncoder;
+
+    @Value("${admin.email}")
+    private String adminEmail;
+
+    @Value("${admin.password}")
+    private String adminPassword;
+
+    @Override
+    public void run(String... args) {
+
+        boolean adminExists = userRepo.findByEmail(adminEmail).isPresent();
+
+        if (adminExists) {
+
+            log.info("Admin account already exists");
+
+            return;
+        }
+
+        User admin = User.builder()
+
+                .username("admin")
+
+                .email(adminEmail)
+
+                .password(passwordEncoder.encode(adminPassword))
+
+                .role(Role.ADMIN)
+
+                .build();
+
+        userRepo.save(admin);
+
+        log.info("Admin account created successfully");
+    }
+}package com.karthik.urlshortener.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
+
+@Configuration
+@EnableJpaAuditing
+public class AuditConfig {
+}
+package com.karthik.urlshortener.config;
+
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class OpenAPIConfig {
+    @Bean
+    public OpenAPI customOpenAPI(){
+        final String securitySchemeName = "bearerAuth";
+        return new OpenAPI().info(new Info().title("KShort API")
+                .version("1.0")
+                .description("Scalable URL Shortener API built with Spring Boot"))
+                .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
+                .components(new Components().addSecuritySchemes(securitySchemeName,new SecurityScheme().name(securitySchemeName).type(SecurityScheme.Type.HTTP)
+                        .scheme("bearer")
+                        .bearerFormat("JWT")));
+    }
+}
+package com.karthik.urlshortener.config;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+
+
+@Configuration
+public class RedisConfig {
+    @Bean
+    public StringRedisTemplate stringRedisTemplate(RedisConnectionFactory redisConnectionFactory){
+        return new StringRedisTemplate(redisConnectionFactory);
+    }
+}
+package com.karthik.urlshortener.security.config;
+
+import com.karthik.urlshortener.security.JwtAuthenticationEntryPoint;
+import com.karthik.urlshortener.security.filter.JwtFilter;
+import com.karthik.urlshortener.user.enums.Role;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+@Configuration
+@RequiredArgsConstructor
+public class SecurityConfig {
+    private final JwtFilter jwtFilter;
+    private final JwtAuthenticationEntryPoint
+            authenticationEntryPoint;
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http.csrf(csrf -> csrf.disable())
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(
+                                authenticationEntryPoint
+                        )
+                )
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth ->
+                        auth.requestMatchers("/api/auth/**", "/swagger-ui/**", "/v3/api-docs/**", "/r/**", "/actuator/health").permitAll()
+                                .requestMatchers("/actuator/**").hasAnyRole("ADMIN")
+                                .anyRequest().authenticated())
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+}
+package com.karthik.urlshortener.security.entity;
+
+import com.karthik.urlshortener.user.entity.User;
+import lombok.Getter;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.util.Collection;
+import java.util.List;
+
+@Getter
+public class CustomUserDetails implements UserDetails {
+
+    private final Long id;
+    private final String username;
+    private final String email;
+    private final String password;
+    private final String role;
+
+    public CustomUserDetails(User user) {
+        this.id = user.getId();
+        this.username = user.getUsername();
+        this.email = user.getEmail();
+        this.password = user.getPassword();
+        this.role = String.valueOf(user.getRole());
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of(new SimpleGrantedAuthority("ROLE_"+role));
+    }
+
+    @Override
+    public String getPassword() {
+        return password;
+    }
+
+    @Override
+    public String getUsername() {
+        return email;
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return true;
+    }
+}
+package com.karthik.urlshortener.security.filter;
+
+import com.karthik.urlshortener.security.service.CustomUserDetailsService;
+import com.karthik.urlshortener.security.service.JwtService;
+import io.jsonwebtoken.JwtException;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class JwtFilter extends OncePerRequestFilter {
+
+    private final JwtService jwtService;
+    private final CustomUserDetailsService userDetailsService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+
+        String authHeader = request.getHeader("Authorization");
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+
+            filterChain.doFilter(request, response);
+
+            return;
+        }
+
+        String token = authHeader.substring(7);
+
+        try {
+
+            if (!jwtService.isTokenValid(token)) {
+
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT token");
+
+                return;
+            }
+
+            String email = jwtService.extractEmail(token);
+
+            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+
+                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            }
+
+        } catch (Exception ex) {
+
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid JWT token");
+
+            return;
+        }
+
+        filterChain.doFilter(request, response);
+    }
+}package com.karthik.urlshortener.security.service;
+
+import com.karthik.urlshortener.common.exception.UserNotFoundException;
+import com.karthik.urlshortener.security.entity.CustomUserDetails;
+import com.karthik.urlshortener.user.entity.User;
+import com.karthik.urlshortener.user.repository.UserRepo;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class CustomUserDetailsService implements UserDetailsService {
+    private final UserRepo userRepo;
+    @Override
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        User user = userRepo
+                .findByEmail(email)
+                .orElseThrow(()->new UserNotFoundException("User not found"));
+        return new CustomUserDetails(user);
+
+    }
+
+}
+package com.karthik.urlshortener.security.service;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import java.security.Key;
+import java.util.Date;
+
+@Service
+public class JwtService {
+    @Value("${jwt.secret}")
+    private String secret;
+    @Value("${jwt.access-token-expiration}")
+    private long accessTokenExpiration;
+
+    @Value("${jwt.refresh-token-expiration}")
+    private long refreshTokenExpiration;
+
+
+    private String buildToken(String email,long expiration){
+        return Jwts.builder().setSubject(email)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date( System.currentTimeMillis()+expiration)).signWith(getSigningKey(), SignatureAlgorithm.HS256).compact();
+    }
+    public String generateAccessToken(String email){
+        return buildToken(email,accessTokenExpiration);
+    }
+    public String generateRefreshToken(String email){
+        return buildToken(email,refreshTokenExpiration);
+    }
+
+    public String extractEmail(String token){
+        return extractClaims(token).getSubject();
+
+    }
+    public boolean isTokenValid(String token){
+        try {
+            extractClaims(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    private Claims extractClaims(String token){
+        return Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+    private Key getSigningKey(){
+        return Keys.hmacShaKeyFor(secret.getBytes());
+    }
+
+}
+package com.karthik.urlshortener.security;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.*;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.stereotype.Component;
+
+import java.io.IOException;
+import java.time.Instant;
+import java.util.Map;
+
+@Component
+public class JwtAuthenticationEntryPoint
+        implements AuthenticationEntryPoint {
+
+    @Override
+    public void commence(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            AuthenticationException authException
+    ) throws IOException, ServletException {
+
+        response.setStatus(
+                HttpServletResponse.SC_UNAUTHORIZED
+        );
+
+        response.setContentType(
+                MediaType.APPLICATION_JSON_VALUE
+        );
+
+        Map<String, Object> body =
+                Map.of(
+                        "success", false,
+                        "message", "Unauthorized",
+                        "timestamp", Instant.now()
+                );
+
+        ObjectMapper mapper =
+                new ObjectMapper();
+
+        mapper.writeValue(
+                response.getOutputStream(),
+                body
+        );
+    }
+}package com.karthik.urlshortener.url.controller;
+
+import com.karthik.urlshortener.analytics.service.AnalyticsService;
+import com.karthik.urlshortener.common.exception.RateLimitExceededException;
+import com.karthik.urlshortener.common.service.RateLimitService;
+import com.karthik.urlshortener.url.entity.Url;
+import com.karthik.urlshortener.url.service.UrlService;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequiredArgsConstructor
+public class RedirectUrlController {
+
+    private final UrlService urlService;
+    private final AnalyticsService analyticsService;
+    private final RateLimitService rateLimitService;
+
+    @GetMapping("/r/{shortCode}")
+    public ResponseEntity<Void> redirect(
+            @PathVariable String shortCode,
+            HttpServletRequest request) {
+
+        String ipAddress = request.getRemoteAddr();
+
+        boolean allowed = rateLimitService.isAllowed(ipAddress);
+
+        if (!allowed) {
+            throw new RateLimitExceededException(
+                    "Too many requests. Please try again later");
+        }
+
+        Url url = urlService.getOriginalUrl(shortCode);
+
+        analyticsService.saveAnalytics(url, request);
+
+        return ResponseEntity.status(302)
+                .header("Location", url.getOriginalUrl())
+                .build();
+    }
+}package com.karthik.urlshortener.url.controller;
+
+import com.karthik.urlshortener.common.dto.ApiResponse;
+import com.karthik.urlshortener.url.dto.CreateShortUrlRequest;
+import com.karthik.urlshortener.url.dto.ShortUrlResponse;
+import com.karthik.urlshortener.url.dto.UserUrlResponse;
+import com.karthik.urlshortener.url.service.UrlService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/urls")
+@RequiredArgsConstructor
+public class UrlController {
+
+    private final UrlService urlService;
+
+    @GetMapping("/my")
+    public ApiResponse<List<UserUrlResponse>> getMyUrls() {
+
+        return ApiResponse.<List<UserUrlResponse>>builder()
+                .success(true)
+                .message("User URLs fetched successfully")
+                .data(urlService.getMyUrls())
+                .build();
+    }
+
+    @PostMapping
+    public ApiResponse<ShortUrlResponse> createShortUrl(
+            @Valid @RequestBody CreateShortUrlRequest request) {
+
+        return ApiResponse.<ShortUrlResponse>builder()
+                .success(true)
+                .message("Short URL created successfully")
+                .data(urlService.createShortUrl(request))
+                .build();
+    }
+}package com.karthik.urlshortener.url.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.Instant;
+
+@Getter
+@Setter
+public class CreateShortUrlRequest {
+    @NotBlank(message = "URL cannot be empty")
+    @Pattern(regexp = "^(https?://).+$", message = "Invalid URL format")
+    private String originalUrl;
+    private Instant expiresAt;
+    @Pattern(regexp = "^[a-zA-Z0-9_-]*$",message = "Alias can only contain letters, numbers, underscores and hyphens" )
+    private String customAlias;
+}
+package com.karthik.urlshortener.url.dto;
+
+import lombok.Builder;
+import lombok.Getter;
+
+@Getter
+@Builder
+public class ShortUrlResponse {
+    private String originalUrl;
+    private String shortCode;
+    private String shortUrl;
+}
+package com.karthik.urlshortener.url.dto;
+
+import lombok.Builder;
+import lombok.Getter;
+
+import java.time.Instant;
+
+@Getter
+@Builder
+public class UserUrlResponse {
+    private String originalUrl;
+    private String shortCode;
+    private String shortUrl;
+    private Long clickCount;
+    private Instant createdAt;
+}
+package com.karthik.urlshortener.url.entity;
+
+import com.karthik.urlshortener.common.entity.BaseEntity;
+import com.karthik.urlshortener.user.entity.User;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.Instant;
+
+@Entity
+@Table(name = "urls",indexes = {
+        @Index(name = "idx_short_code",columnList = "short_code"),
+        @Index(name = "idx_created_at",columnList = "created_at"),
+        @Index(name = "idx_expires_at",columnList = "expires_at")
+})
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Url extends BaseEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "original_url", nullable = false)
+    private String originalUrl;
+
+    @Column(name = "short_code", unique = true)
+    private String shortCode;
+
+    @Builder.Default
+    @Column(name = "click_count")
+    private Long clickCount = 0L;
+
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name="user_id")
+    private User user;
+
+    @Column(name = "expires_at")
+    private Instant expiresAt;
+
+    @Column(name = "custom_Alias", unique = true)
+    private String customAlias;
+
+
+
+}
+package com.karthik.urlshortener.url.repository;
+
+import com.karthik.urlshortener.url.entity.Url;
+import com.karthik.urlshortener.user.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface UrlRepo extends JpaRepository<Url,Long> {
+
+    Optional<Url> findByShortCode(String shortCode);
+    boolean existsByShortCode(String shortCode);
+
+    Optional<Url> findByCustomAlias(String customAlias);
+    boolean existsByCustomAlias(String customAlias);
+
+    Optional<Url> findByOriginalUrl(String originalUrl);
+    List<Url> findByUserOrderByCreatedAtDesc(User user);
+
+    Optional<Url> findByOriginalUrlAndUser(String originalUrl,User user);
+
+    @Transactional
+    @Modifying
+    @Query("""
+       UPDATE Url u
+       SET u.clickCount = u.clickCount + 1
+       WHERE u.id = :urlId
+       """)
+    void incrementClickCount(
+            @Param("urlId") Long urlId
+    );
+    Optional<Url> findByShortCodeAndUserId(
+            String shortCode,
+            Long userId
+    );
+}
+package com.karthik.urlshortener.url.service;
+
+
+import com.karthik.urlshortener.common.config.AppProperties;
+import com.karthik.urlshortener.common.exception.*;
+import com.karthik.urlshortener.common.util.Base62Encoder;
+import com.karthik.urlshortener.security.entity.CustomUserDetails;
+import com.karthik.urlshortener.url.dto.CreateShortUrlRequest;
+import com.karthik.urlshortener.url.dto.ShortUrlResponse;
+import com.karthik.urlshortener.url.dto.UserUrlResponse;
+import com.karthik.urlshortener.url.entity.Url;
+import com.karthik.urlshortener.url.repository.UrlRepo;
+import com.karthik.urlshortener.user.entity.User;
+import com.karthik.urlshortener.user.service.UserService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class UrlService {
+
+    private static final Set<String> RESERVED_ALIASES = Set.of(
+            "api",
+            "app",
+            "login",
+            "register",
+            "dashboard",
+            "admin"
+    );
+
+    private static final Duration CACHE_TTL =
+            Duration.ofHours(24);
+
+    private final UrlRepo urlRepo;
+
+    private final UserService userService;
+
+    private final StringRedisTemplate redisTemplate;
+
+    private final AppProperties appProperties;
+
+    @Transactional
+    public ShortUrlResponse createShortUrl(
+            CreateShortUrlRequest request
+    ) {
+
+        // STEP 1: Get authenticated user
+        final User user =
+                userService.getCurrentUserEntity();
+
+        log.info(
+                "Creating short URL for user: {}",
+                user.getEmail()
+        );
+
+        String customAlias = null;
+
+        // STEP 2: Normalize alias
+        if (request.getCustomAlias() != null &&
+                !request.getCustomAlias().isBlank()) {
+
+            customAlias = request
+                    .getCustomAlias()
+                    .trim()
+                    .toLowerCase();
+
+            // STEP 3: Reserved alias validation
+            if (RESERVED_ALIASES.contains(customAlias)) {
+
+                throw new ReservedAliasException(
+                        "Reserved alias cannot be used"
+                );
+            }
+
+            // STEP 4: Alias uniqueness validation
+            if (urlRepo.existsByCustomAlias(customAlias)) {
+
+                log.warn(
+                        "Custom alias already exists: {}",
+                        customAlias
+                );
+
+                throw new DuplicateAliasException(
+                        "Custom alias already exists"
+                );
+            }
+        }
+
+        // STEP 5: Expiration validation
+        if (request.getExpiresAt() != null &&
+                request.getExpiresAt()
+                        .isBefore(Instant.now())) {
+
+            throw new InvalidExpirationException(
+                    "Expiration date cannot be in the past"
+            );
+        }
+
+        // STEP 6: Duplicate URL detection
+        if (customAlias == null) {
+
+            final Url existingUrl =
+                    urlRepo.findByOriginalUrlAndUser(
+                                    request.getOriginalUrl(),
+                                    user
+                            )
+                            .orElse(null);
+
+            if (existingUrl != null &&
+                    (existingUrl.getExpiresAt() == null ||
+                            existingUrl.getExpiresAt()
+                                    .isAfter(Instant.now()))) {
+
+                log.info(
+                        "Duplicate URL detected for user: {}",
+                        user.getEmail()
+                );
+
+                return buildShortUrlResponse(
+                        existingUrl
+                );
+            }
+        }
+
+        // STEP 7: Create URL entity
+        final Url url = Url.builder()
+
+                .user(user)
+
+                .originalUrl(
+                        request.getOriginalUrl()
+                )
+
+                .expiresAt(
+                        request.getExpiresAt()
+                )
+
+                .customAlias(customAlias)
+
+                .build();
+
+        // STEP 8: Save first to generate ID
+        final Url savedUrl =
+                urlRepo.save(url);
+
+        // STEP 9: Generate short code
+        final String shortCode;
+
+        if (customAlias != null) {
+
+            shortCode = customAlias;
+
+        } else {
+
+            shortCode = Base62Encoder.encode(
+                    savedUrl.getId()
+            );
+        }
+
+        // STEP 10: Update short code
+        savedUrl.setShortCode(shortCode);
+
+        // STEP 11: Save updated entity
+        urlRepo.save(savedUrl);
+
+        log.info(
+                "Short URL created successfully: {}",
+                shortCode
+        );
+
+        // STEP 12: Cache in Redis
+        redisTemplate
+                .opsForValue()
+                .set(
+                        shortCode,
+                        savedUrl.getOriginalUrl(),
+                        CACHE_TTL
+                );
+
+        // STEP 13: Return response
+        return buildShortUrlResponse(
+                savedUrl
+        );
+    }
+
+    public Url getOriginalUrl(
+            String shortCode
+    ) {
+
+        // STEP 1: Check Redis cache
+        final String cachedUrl =
+                redisTemplate
+                        .opsForValue()
+                        .get(shortCode);
+
+        // STEP 2: Database lookup
+        final Url url =
+                urlRepo.findByShortCode(shortCode)
+                        .orElseThrow(() ->
+                                new UrlNotFoundException(
+                                        "Short URL not found"
+                                )
+                        );
+
+        // STEP 3: Validate expiration
+        validateExpiration(url);
+
+        // STEP 4: Atomic click increment
+        urlRepo.incrementClickCount(
+                url.getId()
+        );
+
+        // STEP 5: Cache if absent
+        if (cachedUrl == null) {
+
+            redisTemplate
+                    .opsForValue()
+                    .set(
+                            shortCode,
+                            url.getOriginalUrl(),
+                            CACHE_TTL
+                    );
+        }
+
+        return url;
+    }
+
+    public Url getOwnedUrlByShortCode(
+            String shortCode
+    ) {
+
+        final User currentUser =
+                userService.getCurrentUserEntity();
+
+        final Url url =
+                urlRepo.findByShortCode(shortCode)
+                        .orElseThrow(() ->
+                                new UrlNotFoundException(
+                                        "Short URL not found"
+                                )
+                        );
+
+        if (!url.getUser()
+                .getId()
+                .equals(currentUser.getId())) {
+
+            throw new UnauthorizedException(
+                    "You do not own this URL"
+            );
+        }
+
+        return url;
+    }
+
+    public List<UserUrlResponse> getMyUrls() {
+
+        final User user =
+                userService.getCurrentUserEntity();
+
+        return urlRepo
+                .findByUserOrderByCreatedAtDesc(
+                        user
+                )
+                .stream()
+
+                .map(this::buildUserUrlResponse)
+
+                .toList();
+    }
+
+    private void validateExpiration(
+            Url url
+    ) {
+
+        if (url.getExpiresAt() != null &&
+                url.getExpiresAt()
+                        .isBefore(Instant.now())) {
+
+            throw new UrlExpiredException(
+                    "Short URL has expired"
+            );
+        }
+    }
+
+    private ShortUrlResponse buildShortUrlResponse(
+            Url url
+    ) {
+
+        return ShortUrlResponse.builder()
+
+                .originalUrl(
+                        url.getOriginalUrl()
+                )
+
+                .shortCode(
+                        url.getShortCode()
+                )
+
+                .shortUrl(
+                        appProperties.getBaseShortUrl()
+                                + url.getShortCode()
+                )
+
+                .build();
+    }
+
+    private UserUrlResponse buildUserUrlResponse(
+            Url url
+    ) {
+
+        return UserUrlResponse.builder()
+
+                .originalUrl(
+                        url.getOriginalUrl()
+                )
+
+                .shortCode(
+                        url.getShortCode()
+                )
+
+                .shortUrl(
+                        appProperties.getBaseShortUrl()
+                                + url.getShortCode()
+                )
+
+                .clickCount(
+                        url.getClickCount()
+                )
+
+                .createdAt(
+                        url.getCreatedAt()
+                )
+
+                .build();
+    }
+}package com.karthik.urlshortener.user.entity;
+
+import com.karthik.urlshortener.url.entity.Url;
+import com.karthik.urlshortener.user.enums.Role;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+@Table(name = "users")
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private String username;
+
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column(nullable = false)
+    private String password;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role;
+    private Instant createdAt;
+
+    @OneToMany(mappedBy = "user",cascade = CascadeType.ALL)
+    private List<Url> urls = new ArrayList<>();
+
+    @PrePersist
+    public void prePersist(){
+        this.createdAt = Instant.now();
+    }
+}
+package com.karthik.urlshortener.user.enums;
+
+public enum Role {
+    USER,ADMIN
+}
+package com.karthik.urlshortener.user.repository;
+
+import com.karthik.urlshortener.user.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.Optional;
+
+@Repository
+public interface UserRepo extends JpaRepository<User,Long> {
+    Optional<User> findByEmail(String email);
+    boolean existsByEmail(String email);
+
+}
+package com.karthik.urlshortener.user.service;
+
+import com.karthik.urlshortener.common.exception.UserNotFoundException;
+import com.karthik.urlshortener.security.entity.CustomUserDetails;
+import com.karthik.urlshortener.user.entity.User;
+import com.karthik.urlshortener.user.repository.UserRepo;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+
+@Service
+@RequiredArgsConstructor
+public class UserService {
+
+    private final UserRepo userRepo;
+
+    public CustomUserDetails
+    getAuthenticatedUser() {
+
+        Authentication authentication =
+                SecurityContextHolder
+                        .getContext()
+                        .getAuthentication();
+
+        return (CustomUserDetails)
+                authentication.getPrincipal();
+    }
+
+    public User getCurrentUserEntity() {
+
+        CustomUserDetails currentUser =
+                getAuthenticatedUser();
+
+        return userRepo.findById(
+                currentUser.getId()
+        ).orElseThrow(() ->
+                new UserNotFoundException(
+                        "User not found"
+                )
+        );
+    }
+}package com.karthik.urlshortener;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class UrlShortenerApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(UrlShortenerApplication.class, args);
+    }
+
+}
+spring:
+  application:
+    name: url-shortener
+
+  datasource:
+    url: jdbc:postgresql://localhost:5433/shortner
+    username: postgres
+    password: 12345678
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+
+    show-sql: true
+
+    properties:
+      hibernate:
+        format_sql: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+server:
+  port: 8080
+jwt:
+  secret: OtblqURjs3nX78MAxLYefqcnfu8PS8p1zsFqgwaMVER
+  access-token-expiration: 900000
+  refresh-token-expiration: 604800000
+logging:
+  level:
+    root: INFO
+    com.karthik.urlshortener: DEBUG
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%level] %logger{36} - %msg%n"
+management:
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - info
+          - metrics
+  endpoint:
+    health:
+      show-details: never
+  info:
+    env:
+      enabled: true
+info:
+  app:
+    name: KShort
+    description:  URL Shortener backend
+    version: 1.0.0
+admin:
+  email: admin@kshort.com
+  password: admin123
+app:
+  base-short-url: https://go.karthiknarravula.dev/r/
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.14</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+    <groupId>com.karthik</groupId>
+    <artifactId>url-shortner</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>url-shortner</name>
+    <description>url-shortener</description>
+    <url/>
+    <licenses>
+        <license/>
+    </licenses>
+    <developers>
+        <developer/>
+    </developers>
+    <scm>
+        <connection/>
+        <developerConnection/>
+        <tag/>
+        <url/>
+    </scm>
+    <properties>
+        <java.version>21</java.version>
+    </properties>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.8.16</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.11.5</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.11.5</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>default-compile</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <annotationProcessorPaths>
+                                <path>
+                                    <groupId>org.projectlombok</groupId>
+                                    <artifactId>lombok</artifactId>
+                                </path>
+                            </annotationProcessorPaths>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>default-testCompile</id>
+                        <phase>test-compile</phase>
+                        <goals>
+                            <goal>testCompile</goal>
+                        </goals>
+                        <configuration>
+                            <annotationProcessorPaths>
+                                <path>
+                                    <groupId>org.projectlombok</groupId>
+                                    <artifactId>lombok</artifactId>
+                                </path>
+                            </annotationProcessorPaths>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

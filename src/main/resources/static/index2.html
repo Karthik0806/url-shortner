@@ -1,0 +1,1899 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KShort — URL Shortener</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Geist+Mono:wght@300;400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ──────────── TOKENS ──────────── */
+    :root {
+      --radius: 16px;
+      --radius-sm: 10px;
+      --font-display: 'Cormorant Garamond', Georgia, serif;
+      --font-body: 'Outfit', sans-serif;
+      --font-mono: 'Geist Mono', monospace;
+      --transition: .28s cubic-bezier(.4,0,.2,1);
+      --transition-spring: .5s cubic-bezier(.34,1.56,.64,1);
+    }
+
+    [data-theme="dark"] {
+      --bg:           #0d0d0d;
+      --bg-2:         #141414;
+      --bg-3:         #1a1a1a;
+      --surface:      #171717;
+      --surface-2:    #1f1f1f;
+      --surface-3:    #282828;
+      --border:       #2a2a2a;
+      --border-2:     #333;
+      --text:         #f0ece4;
+      --text-2:       #a09890;
+      --text-3:       #6b6560;
+      --gold:         #c9a96e;
+      --gold-dim:     #8a6f45;
+      --cream:        #f5f0e8;
+      --ink:          #1c1a18;
+      --success:      #7ea87e;
+      --danger:       #c47c6a;
+      --glow:         rgba(201,169,110,.12);
+      --shadow-lg:    0 32px 80px rgba(0,0,0,.7);
+      --shadow-md:    0 12px 40px rgba(0,0,0,.5);
+      --shadow-sm:    0 4px 16px rgba(0,0,0,.4);
+      --nav-bg:       rgba(13,13,13,.85);
+    }
+
+    [data-theme="light"] {
+      --bg:           #f7f4ef;
+      --bg-2:         #f0ece4;
+      --bg-3:         #e8e2d8;
+      --surface:      #faf8f4;
+      --surface-2:    #f2ede6;
+      --surface-3:    #e9e3d9;
+      --border:       #d8d0c4;
+      --border-2:     #ccc5b8;
+      --text:         #1c1a18;
+      --text-2:       #5a5448;
+      --text-3:       #8a8278;
+      --gold:         #9a7040;
+      --gold-dim:     #c9a96e;
+      --cream:        #1c1a18;
+      --ink:          #f5f0e8;
+      --success:      #4a7a4a;
+      --danger:       #9a4a3a;
+      --glow:         rgba(154,112,64,.08);
+      --shadow-lg:    0 32px 80px rgba(0,0,0,.15);
+      --shadow-md:    0 12px 40px rgba(0,0,0,.1);
+      --shadow-sm:    0 4px 16px rgba(0,0,0,.08);
+      --nav-bg:       rgba(247,244,239,.9);
+    }
+
+    /* ──────────── RESET ──────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+      transition: background var(--transition), color var(--transition);
+    }
+
+    /* ──────────── GLOBAL BG TEXTURE ──────────── */
+    .bg-canvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .bg-canvas::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+              radial-gradient(ellipse 70% 60% at 15% 10%, var(--glow) 0%, transparent 60%),
+              radial-gradient(ellipse 50% 50% at 85% 90%, var(--glow) 0%, transparent 60%);
+    }
+
+    /* Subtle grain */
+    .bg-canvas::after {
+      content: '';
+      position: absolute;
+      inset: -50%;
+      width: 200%;
+      height: 200%;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23g)' opacity='0.035'/%3E%3C/svg%3E");
+      opacity: 1;
+    }
+
+    /* Fine grid lines */
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background-image:
+              linear-gradient(var(--border) 1px, transparent 1px),
+              linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 64px 64px;
+      opacity: 0.25;
+      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
+    }
+
+    #app { position: relative; z-index: 1; }
+
+    /* ──────────── NAV ──────────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      height: 66px;
+      background: var(--nav-bg);
+      backdrop-filter: blur(24px) saturate(1.4);
+      border-bottom: 1px solid var(--border);
+      transition: background var(--transition), border-color var(--transition);
+    }
+
+    .logo {
+      font-family: var(--font-display);
+      font-size: 1.65rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      user-select: none;
+      transition: opacity var(--transition);
+    }
+
+    .logo:hover { opacity: 0.7; }
+
+    .logo em {
+      font-style: italic;
+      font-weight: 300;
+      color: var(--gold);
+    }
+
+    .logo-dot {
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--gold);
+      margin-left: 3px;
+      margin-bottom: 8px;
+      animation: breathe 3s ease-in-out infinite;
+    }
+
+    @keyframes breathe {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.6); }
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Theme toggle */
+    .theme-toggle {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-2);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+      transition: all var(--transition);
+      flex-shrink: 0;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+      transform: rotate(20deg);
+    }
+
+    /* ──────────── PAGES ──────────── */
+    .page { display: none; }
+    .page.active { display: block; animation: pageIn .45s cubic-bezier(.4,0,.2,1); }
+
+    @keyframes pageIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ──────────── BUTTONS ──────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 22px;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-body);
+      font-weight: 500;
+      font-size: .875rem;
+      cursor: pointer;
+      border: none;
+      transition: all var(--transition);
+      text-decoration: none;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.08) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+
+    .btn:hover::after { opacity: 1; }
+
+    .btn-gold {
+      background: var(--gold);
+      color: var(--ink);
+      box-shadow: 0 4px 20px rgba(201,169,110,.3);
+      font-weight: 600;
+    }
+
+    .btn-gold:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(201,169,110,.45);
+      filter: brightness(1.08);
+    }
+
+    .btn-gold:active { transform: translateY(0); }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text-2);
+      border: 1px solid var(--border);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+      background: var(--glow);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-3);
+      padding: 10px 16px;
+    }
+
+    .btn-ghost:hover { color: var(--text); }
+
+    .btn-subtle {
+      background: var(--surface-3);
+      color: var(--text-2);
+      border: 1px solid var(--border);
+    }
+
+    .btn-subtle:hover { border-color: var(--gold); color: var(--gold); }
+
+    .btn-danger-soft {
+      background: transparent;
+      color: var(--danger);
+      border: 1px solid rgba(196,124,106,.25);
+      padding: 7px 14px;
+      font-size: .8rem;
+    }
+
+    .btn-danger-soft:hover { background: rgba(196,124,106,.1); }
+
+    .btn-sm { padding: 8px 16px; font-size: .8rem; }
+    .btn-full { width: 100%; }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; }
+
+    /* ──────────── INPUTS ──────────── */
+    label {
+      font-size: .7rem;
+      font-family: var(--font-mono);
+      color: var(--text-3);
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    input, select {
+      width: 100%;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: .875rem;
+      padding: 12px 16px;
+      outline: none;
+      transition: all var(--transition);
+      -webkit-appearance: none;
+    }
+
+    input::placeholder { color: var(--text-3); }
+
+    input:focus, select:focus {
+      border-color: var(--gold);
+      background: var(--surface);
+      box-shadow: 0 0 0 3px var(--glow), inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    select { cursor: pointer; }
+
+    select option { background: var(--surface-2); }
+
+    /* ──────────── HERO ──────────── */
+    .hero {
+      min-height: calc(100vh - 66px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px 24px;
+      text-align: center;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 18px;
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      font-family: var(--font-mono);
+      font-size: .7rem;
+      color: var(--text-3);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 40px;
+      animation: slideIn .6s cubic-bezier(.4,0,.2,1) both;
+    }
+
+    .hero-eyebrow-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--gold);
+      animation: breathe 2s ease-in-out infinite;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-title {
+      font-family: var(--font-display);
+      font-size: clamp(3rem, 8vw, 7rem);
+      font-weight: 300;
+      letter-spacing: -0.01em;
+      line-height: 1.05;
+      margin-bottom: 28px;
+      animation: slideIn .7s .1s cubic-bezier(.4,0,.2,1) both;
+    }
+
+    .hero-title em {
+      font-style: italic;
+      color: var(--gold);
+    }
+
+    .hero-sub {
+      font-size: 1.05rem;
+      color: var(--text-2);
+      max-width: 460px;
+      line-height: 1.7;
+      font-weight: 300;
+      margin-bottom: 56px;
+      animation: slideIn .7s .2s cubic-bezier(.4,0,.2,1) both;
+    }
+
+    /* ──────────── SHORTEN BOX ──────────── */
+    .shorten-box {
+      width: 100%;
+      max-width: 680px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 32px;
+      box-shadow: var(--shadow-lg);
+      animation: slideIn .7s .3s cubic-bezier(.4,0,.2,1) both;
+      position: relative;
+    }
+
+    .shorten-box::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      opacity: 0.5;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .input-group { display: flex; flex-direction: column; }
+
+    .options-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 14px;
+      animation: slideIn .3s ease;
+    }
+
+    .box-footer {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .options-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .9rem;
+      transition: all var(--transition);
+      flex-shrink: 0;
+    }
+
+    .options-btn:hover, .options-btn.active {
+      border-color: var(--gold);
+      color: var(--gold);
+      background: var(--glow);
+    }
+
+    /* Result */
+    .result-card {
+      display: none;
+      margin-top: 20px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      animation: resultIn .4s cubic-bezier(.34,1.56,.64,1);
+    }
+
+    @keyframes resultIn {
+      from { opacity: 0; transform: scale(.96) translateY(8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .result-card.show { display: block; }
+
+    .result-label {
+      font-family: var(--font-mono);
+      font-size: .65rem;
+      color: var(--success);
+      letter-spacing: .15em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .result-label::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+
+    .result-url-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+    }
+
+    .result-url-text {
+      flex: 1;
+      font-family: var(--font-mono);
+      font-size: .9rem;
+      color: var(--gold);
+      word-break: break-all;
+    }
+
+    /* ──────────── AUTH ──────────── */
+    .auth-wrap {
+      min-height: calc(100vh - 66px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .auth-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 44px;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+    }
+
+    .auth-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--gold), transparent);
+      opacity: 0.5;
+    }
+
+    .auth-title {
+      font-family: var(--font-display);
+      font-size: 2.2rem;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+      margin-bottom: 6px;
+    }
+
+    .auth-title em { font-style: italic; color: var(--gold); }
+
+    .auth-sub {
+      font-size: .875rem;
+      color: var(--text-3);
+      margin-bottom: 36px;
+    }
+
+    .form-group { margin-bottom: 20px; }
+
+    .form-footer {
+      margin-top: 28px;
+      text-align: center;
+      font-size: .85rem;
+      color: var(--text-3);
+    }
+
+    .form-footer a {
+      color: var(--gold);
+      cursor: pointer;
+      text-decoration: none;
+      font-weight: 500;
+      transition: opacity var(--transition);
+    }
+
+    .form-footer a:hover { opacity: 0.7; }
+
+    /* ──────────── DASHBOARD ──────────── */
+    .dashboard {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 56px 28px;
+    }
+
+    .dash-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      margin-bottom: 40px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .dash-title {
+      font-family: var(--font-display);
+      font-size: 2.8rem;
+      font-weight: 300;
+      letter-spacing: -0.01em;
+      line-height: 1;
+    }
+
+    .dash-title em { font-style: italic; color: var(--gold); }
+
+    .dash-sub {
+      font-size: .875rem;
+      color: var(--text-3);
+      margin-top: 8px;
+    }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+      transition: border-color var(--transition), transform var(--transition);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, var(--glow) 0%, transparent 60%);
+      opacity: 0;
+      transition: opacity var(--transition);
+    }
+
+    .stat-card:hover { border-color: var(--gold-dim); transform: translateY(-2px); }
+    .stat-card:hover::after { opacity: 1; }
+
+    .stat-label {
+      font-family: var(--font-mono);
+      font-size: .65rem;
+      color: var(--text-3);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .stat-value {
+      font-family: var(--font-display);
+      font-size: 3rem;
+      font-weight: 400;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .stat-value.gold { color: var(--gold); }
+    .stat-value.green { color: var(--success); }
+
+    /* Table */
+    .table-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+
+    .table-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 28px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table-title {
+      font-family: var(--font-mono);
+      font-size: .7rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--text-3);
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    th {
+      padding: 12px 20px;
+      font-family: var(--font-mono);
+      font-size: .62rem;
+      color: var(--text-3);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-2);
+    }
+
+    td {
+      padding: 16px 20px;
+      font-size: .875rem;
+      border-bottom: 1px solid rgba(42,42,42,.5);
+      vertical-align: middle;
+    }
+
+    [data-theme="light"] td {
+      border-bottom: 1px solid rgba(216,208,196,.4);
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    tr td { transition: background var(--transition); }
+
+    tr:hover td { background: var(--glow); }
+
+    .short-code {
+      font-family: var(--font-mono);
+      font-size: .82rem;
+      color: var(--gold);
+      cursor: pointer;
+      transition: opacity var(--transition);
+    }
+
+    .short-code:hover { opacity: 0.7; text-decoration: underline; }
+
+    .orig-url {
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      color: var(--text-3);
+      max-width: 240px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .click-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(126,168,126,.1);
+      color: var(--success);
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      font-weight: 500;
+      border: 1px solid rgba(126,168,126,.2);
+    }
+
+    .expired-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: rgba(196,124,106,.08);
+      color: var(--danger);
+      font-family: var(--font-mono);
+      font-size: .7rem;
+      border: 1px solid rgba(196,124,106,.2);
+      margin-top: 4px;
+    }
+
+    .time-text {
+      font-family: var(--font-mono);
+      font-size: .75rem;
+      color: var(--text-3);
+    }
+
+    .action-row { display: flex; gap: 8px; }
+
+    /* Pagination */
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .pg-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-3);
+      font-family: var(--font-mono);
+      font-size: .8rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition);
+    }
+
+    .pg-btn:hover { border-color: var(--gold); color: var(--gold); }
+    .pg-btn.active { background: var(--gold); border-color: var(--gold); color: var(--ink); }
+    .pg-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* ──────────── MODALS ──────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.65);
+      backdrop-filter: blur(12px) saturate(0.8);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .modal-overlay.show {
+      display: flex;
+      animation: overlayIn .25s ease;
+    }
+
+    @keyframes overlayIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 780px;
+      max-height: 88vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+      animation: modalIn .35s cubic-bezier(.34,1.3,.64,1);
+    }
+
+    @keyframes modalIn {
+      from { transform: scale(.95) translateY(16px); opacity: 0; }
+      to { transform: scale(1) translateY(0); opacity: 1; }
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 22px 28px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+      z-index: 10;
+    }
+
+    .modal-title {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 400;
+    }
+
+    .modal-close {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-3);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .9rem;
+      transition: all var(--transition);
+    }
+
+    .modal-close:hover { border-color: var(--text-2); color: var(--text); }
+
+    .modal-body { padding: 28px; }
+
+    /* Analytics */
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+
+    .analytics-meta-card {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px;
+    }
+
+    .analytics-meta-label {
+      font-family: var(--font-mono);
+      font-size: .62rem;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      margin-bottom: 8px;
+    }
+
+    .analytics-meta-value {
+      font-family: var(--font-display);
+      font-size: 2rem;
+      font-weight: 400;
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+
+    .analytics-table-wrap {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .analytics-table-label {
+      padding: 14px 20px;
+      font-family: var(--font-mono);
+      font-size: .65rem;
+      color: var(--text-3);
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .device-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: .72rem;
+    }
+
+    .device-badge.MOBILE  { background: rgba(201,169,110,.1); color: var(--gold); border: 1px solid rgba(201,169,110,.2); }
+    .device-badge.DESKTOP { background: rgba(126,168,126,.1); color: var(--success); border: 1px solid rgba(126,168,126,.2); }
+    .device-badge.TABLET  { background: rgba(196,124,106,.1); color: var(--danger); border: 1px solid rgba(196,124,106,.2); }
+    .device-badge.UNKNOWN { background: rgba(107,101,96,.1); color: var(--text-3); border: 1px solid var(--border); }
+
+    /* ──────────── USER PILL ──────────── */
+    .user-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+      padding: 5px 14px 5px 5px;
+      cursor: pointer;
+      transition: border-color var(--transition);
+      position: relative;
+    }
+
+    .user-pill:hover { border-color: var(--gold-dim); }
+
+    .user-avatar {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--gold-dim), var(--gold));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: .82rem;
+      color: var(--ink);
+      flex-shrink: 0;
+    }
+
+    .user-name {
+      font-size: .82rem;
+      font-weight: 500;
+      max-width: 110px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .user-dropdown {
+      display: none;
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      min-width: 175px;
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+      animation: pageIn .2s ease;
+      z-index: 300;
+    }
+
+    .user-pill.open .user-dropdown { display: block; }
+
+    .dropdown-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 16px;
+      font-size: .85rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--text-2);
+      width: 100%;
+      text-align: left;
+      transition: background var(--transition), color var(--transition);
+    }
+
+    .dropdown-item:hover { background: var(--surface-3); color: var(--text); }
+    .dropdown-item.danger { color: var(--danger); }
+    .dropdown-item.danger:hover { background: rgba(196,124,106,.08); }
+
+    .dropdown-sep {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+
+    /* ──────────── TOASTS ──────────── */
+    .toast-rack {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 9999;
+    }
+
+    .toast {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: .85rem;
+      font-weight: 500;
+      box-shadow: var(--shadow-md);
+      min-width: 250px;
+      max-width: 360px;
+      animation: toastIn .35s cubic-bezier(.34,1.56,.64,1);
+    }
+
+    @keyframes toastIn {
+      from { transform: translateX(20px) scale(.96); opacity: 0; }
+      to { transform: translateX(0) scale(1); opacity: 1; }
+    }
+
+    .toast.out {
+      animation: toastOut .3s ease forwards;
+    }
+
+    @keyframes toastOut {
+      to { transform: translateX(20px); opacity: 0; }
+    }
+
+    .toast.success { border-left: 2px solid var(--success); }
+    .toast.error   { border-left: 2px solid var(--danger); }
+    .toast.info    { border-left: 2px solid var(--gold); }
+
+    .toast-icon { font-size: 1rem; }
+
+    /* ──────────── EMPTY STATE ──────────── */
+    .empty-state {
+      text-align: center;
+      padding: 64px 24px;
+      color: var(--text-3);
+    }
+
+    .empty-icon {
+      font-size: 2.5rem;
+      margin-bottom: 16px;
+      display: block;
+      opacity: 0.4;
+    }
+
+    .empty-state h3 {
+      font-family: var(--font-display);
+      font-size: 1.4rem;
+      font-weight: 400;
+      color: var(--text-2);
+      margin-bottom: 8px;
+    }
+
+    .empty-state p { font-size: .875rem; margin-bottom: 24px; }
+
+    /* ──────────── SPINNER ──────────── */
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(201,169,110,.2);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin .65s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ──────────── ERRORS ──────────── */
+    .error-msg {
+      font-family: var(--font-mono);
+      font-size: .76rem;
+      color: var(--danger);
+      margin-top: 10px;
+      display: none;
+      animation: slideIn .2s ease;
+    }
+
+    .error-msg.show { display: block; }
+
+    /* ──────────── DIVIDER ──────────── */
+    .divider { height: 1px; background: var(--border); margin: 6px 0; }
+
+    /* ──────────── SCROLL ──────────── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
+
+    /* ──────────── RESPONSIVE ──────────── */
+    @media (max-width: 680px) {
+      nav { padding: 0 20px; }
+      .hero { padding: 60px 20px; }
+      .shorten-box { padding: 22px; }
+      .input-row, .options-row { flex-direction: column; }
+      .dashboard { padding: 32px 16px; }
+      .stats-grid { grid-template-columns: 1fr; }
+      .dash-header { flex-direction: column; align-items: flex-start; }
+      td, th { padding: 10px 14px; }
+      .orig-url { max-width: 120px; }
+      .auth-card { padding: 28px 22px; }
+      .modal-overlay { align-items: flex-end; padding: 0; }
+      .modal { border-radius: 20px 20px 0 0; max-height: 90vh; }
+    }
+
+    @media (max-width: 480px) {
+      .hero-title { font-size: 2.6rem; }
+    }
+
+    /* ──────────── HOVER SHIMMER ──────────── */
+    .shimmer-btn {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .shimmer-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 60%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.15), transparent);
+      transform: skewX(-20deg);
+      transition: left .5s ease;
+    }
+
+    .shimmer-btn:hover::before { left: 160%; }
+
+    /* Animated gold line on cards */
+    @keyframes lineSweep {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(200%); }
+    }
+  </style>
+</head>
+<body>
+<div class="bg-canvas"></div>
+<div class="bg-grid"></div>
+
+<div id="app">
+  <!-- NAV -->
+  <nav>
+    <div class="logo" onclick="navigateTo('home')">
+      K<em>Short</em><span class="logo-dot"></span>
+    </div>
+    <div class="nav-right" id="navActions">
+      <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="themeBtn">☀</button>
+      <button class="btn btn-ghost btn-sm" onclick="navigateTo('login')">Log in</button>
+      <button class="btn btn-gold btn-sm shimmer-btn" onclick="navigateTo('register')">Sign up</button>
+    </div>
+  </nav>
+
+  <!-- HOME -->
+  <div id="page-home" class="page active">
+    <div class="hero">
+      <div class="hero-eyebrow">
+        <span class="hero-eyebrow-dot"></span>
+        Production-grade URL shortener
+      </div>
+      <h1 class="hero-title">
+        Shrink links.<br>
+        Track <em>everything.</em>
+      </h1>
+      <p class="hero-sub">
+        Create elegant short links in seconds. Track clicks, devices, and referrers — all in one refined dashboard.
+      </p>
+
+      <div class="shorten-box">
+        <div class="input-row">
+          <div class="input-group" style="flex:1">
+            <label>Long URL</label>
+            <input type="url" id="homeLongUrl" placeholder="https://your-long-url.com/goes/here" />
+          </div>
+        </div>
+
+        <div class="options-row" id="homeOptions" style="display:none">
+          <div class="input-group" style="flex:1">
+            <label>Custom alias (optional)</label>
+            <input type="text" id="homeAlias" placeholder="my-cool-link" />
+          </div>
+          <div class="input-group" style="flex:1">
+            <label>Expiry (optional)</label>
+            <input type="datetime-local" id="homeExpiry" />
+          </div>
+        </div>
+
+        <div class="box-footer">
+          <button class="btn btn-gold btn-full shimmer-btn" id="shortenBtn" onclick="handleShorten()">
+            Shorten URL
+          </button>
+          <button class="options-btn" id="optionsToggle" onclick="toggleOptions()" title="Options">⚙</button>
+        </div>
+
+        <p id="homeError" class="error-msg"></p>
+
+        <div id="homeResult" class="result-card">
+          <div class="result-label">Link created</div>
+          <div class="result-url-row">
+            <span class="result-url-text" id="homeResultUrl"></span>
+            <button class="btn btn-sm btn-outline" onclick="copyResult()">Copy</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="page-login" class="page">
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <h2 class="auth-title">Welcome <em>back</em></h2>
+        <p class="auth-sub">Sign in to access your dashboard.</p>
+
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="loginEmail" placeholder="you@example.com" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="loginPassword" placeholder="••••••••"
+                 onkeydown="if(event.key==='Enter') handleLogin()" />
+        </div>
+
+        <p id="loginError" class="error-msg"></p>
+        <button class="btn btn-gold btn-full shimmer-btn" id="loginBtn" onclick="handleLogin()" style="margin-top:10px">
+          Sign in
+        </button>
+
+        <div class="form-footer">
+          No account? <a onclick="navigateTo('register')">Create one →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- REGISTER -->
+  <div id="page-register" class="page">
+    <div class="auth-wrap">
+      <div class="auth-card">
+        <h2 class="auth-title">Create <em>account</em></h2>
+        <p class="auth-sub">Start shortening and tracking your links.</p>
+
+        <div class="form-group">
+          <label>Username</label>
+          <input type="text" id="regUsername" placeholder="karthik" />
+        </div>
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" id="regEmail" placeholder="you@example.com" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="regPassword" placeholder="Min 8 characters"
+                 onkeydown="if(event.key==='Enter') handleRegister()" />
+        </div>
+
+        <p id="regError" class="error-msg"></p>
+        <button class="btn btn-gold btn-full shimmer-btn" id="regBtn" onclick="handleRegister()" style="margin-top:10px">
+          Create account
+        </button>
+
+        <div class="form-footer">
+          Already have an account? <a onclick="navigateTo('login')">Sign in →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="page-dashboard" class="page">
+    <div class="dashboard">
+      <div class="dash-header">
+        <div>
+          <h2 class="dash-title">My <em>Links</em></h2>
+          <p class="dash-sub" id="dashGreeting"></p>
+        </div>
+        <button class="btn btn-gold shimmer-btn" onclick="openCreateModal()">+ New link</button>
+      </div>
+
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="stat-label">Total links</div>
+          <div class="stat-value gold" id="statLinks">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total clicks</div>
+          <div class="stat-value green" id="statClicks">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active links</div>
+          <div class="stat-value" id="statActive">—</div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-toolbar">
+          <span class="table-title">All links</span>
+          <button class="btn btn-ghost btn-sm" onclick="loadDashboard()">↺ Refresh</button>
+        </div>
+        <div id="urlTableContainer">
+          <div class="empty-state">
+            <span class="empty-icon">🔗</span>
+            <h3>No links yet</h3>
+            <p>Shorten your first URL to see it here.</p>
+            <button class="btn btn-gold btn-sm shimmer-btn" onclick="openCreateModal()">Create link</button>
+          </div>
+        </div>
+        <div class="pagination" id="pagination" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CREATE MODAL -->
+<div class="modal-overlay" id="createModal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <h3 class="modal-title">New <em style="font-family:var(--font-display);font-style:italic;color:var(--gold)">short link</em></h3>
+      <button class="modal-close" onclick="closeModal('createModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Long URL *</label>
+        <input type="url" id="modalUrl" placeholder="https://example.com/your-long-path" />
+      </div>
+      <div class="form-group">
+        <label>Custom alias (optional)</label>
+        <input type="text" id="modalAlias" placeholder="e.g. my-project" />
+      </div>
+      <div class="form-group">
+        <label>Expiration date (optional)</label>
+        <input type="datetime-local" id="modalExpiry" />
+      </div>
+      <p id="modalError" class="error-msg"></p>
+      <div style="display:flex;gap:10px;margin-top:24px">
+        <button class="btn btn-outline" style="flex:1" onclick="closeModal('createModal')">Cancel</button>
+        <button class="btn btn-gold shimmer-btn" style="flex:2" id="createBtn" onclick="handleCreate()">Create link</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ANALYTICS MODAL -->
+<div class="modal-overlay" id="analyticsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title" id="analyticsTitle">Analytics</h3>
+        <div style="font-family:var(--font-mono);font-size:.75rem;color:var(--text-3);margin-top:4px" id="analyticsUrl"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('analyticsModal')">✕</button>
+    </div>
+    <div class="modal-body" id="analyticsBody">
+      <div class="empty-state"><span class="spinner" style="width:28px;height:28px;border-width:3px"></span></div>
+    </div>
+  </div>
+</div>
+
+<!-- TOASTS -->
+<div class="toast-rack" id="toasts"></div>
+
+<script>
+  // ──────────── CONFIG ────────────
+  const BASE = 'http://localhost:8080';
+
+  // ──────────── STATE ────────────
+  let auth = JSON.parse(localStorage.getItem('kshort_auth') || 'null');
+  let currentPage = 0;
+  let totalPages = 0;
+  let optionsOpen = false;
+
+  // ──────────── THEME ────────────
+  const savedTheme = localStorage.getItem('kshort_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  function updateThemeBtn() {
+    const btn = document.getElementById('themeBtn');
+    if (btn) btn.textContent = document.documentElement.getAttribute('data-theme') === 'dark' ? '☀' : '☾';
+  }
+  updateThemeBtn();
+
+  function toggleTheme() {
+    const cur = document.documentElement.getAttribute('data-theme');
+    const next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('kshort_theme', next);
+    updateThemeBtn();
+  }
+
+  // ──────────── INIT ────────────
+  function init() {
+    renderNav();
+    const hash = location.hash.replace('#', '') || 'home';
+    if (auth && ['home','login','register'].includes(hash)) {
+      navigateTo('dashboard');
+    } else {
+      navigateTo(hash);
+    }
+  }
+
+  // ──────────── NAV ────────────
+  function navigateTo(page) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    const el = document.getElementById('page-' + page);
+    if (!el) return;
+    el.classList.add('active');
+    location.hash = page;
+    window.scrollTo(0, 0);
+    if (page === 'dashboard') {
+      if (!auth) { navigateTo('login'); return; }
+      loadDashboard();
+    }
+  }
+
+  function renderNav() {
+    const nav = document.getElementById('navActions');
+    const themeBtn = `<button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Toggle theme">${document.documentElement.getAttribute('data-theme') === 'dark' ? '☀' : '☾'}</button>`;
+
+    if (auth) {
+      const initial = (auth.username || auth.email || 'U')[0].toUpperCase();
+      nav.innerHTML = `
+                ${themeBtn}
+                <button class="btn btn-ghost btn-sm" onclick="navigateTo('dashboard')">Dashboard</button>
+                <div class="user-pill" id="userPill" onclick="toggleDropdown(event)">
+                    <div class="user-avatar">${initial}</div>
+                    <span class="user-name">${auth.username || auth.email}</span>
+                    <div class="user-dropdown" id="userDropdown">
+                        <button class="dropdown-item" onclick="navigateTo('dashboard')">📊 Dashboard</button>
+                        <div class="dropdown-sep"></div>
+                        <button class="dropdown-item danger" onclick="handleLogout()">↪ Sign out</button>
+                    </div>
+                </div>`;
+    } else {
+      nav.innerHTML = `
+                ${themeBtn}
+                <button class="btn btn-ghost btn-sm" onclick="navigateTo('login')">Log in</button>
+                <button class="btn btn-gold btn-sm shimmer-btn" onclick="navigateTo('register')">Sign up</button>`;
+    }
+  }
+
+  function toggleDropdown(e) {
+    e.stopPropagation();
+    const pill = document.getElementById('userPill');
+    if (pill) pill.classList.toggle('open');
+  }
+
+  document.addEventListener('click', () => {
+    const pill = document.getElementById('userPill');
+    if (pill) pill.classList.remove('open');
+  });
+
+  // ──────────── API ────────────
+  async function api(method, path, body = null, requireAuth = false) {
+    const headers = { 'Content-Type': 'application/json' };
+    if (requireAuth && auth) headers['Authorization'] = 'Bearer ' + auth.accessToken;
+    const resp = await fetch(BASE + path, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : null
+    });
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(json.message || 'Something went wrong');
+    return json;
+  }
+
+  // ──────────── AUTH ────────────
+  async function handleLogin() {
+    const email = val('loginEmail'), password = val('loginPassword');
+    if (!email || !password) { showErr('loginError', 'Please fill all fields.'); return; }
+    hideErr('loginError');
+    setLoad('loginBtn', true, 'Signing in...');
+    try {
+      const res = await api('POST', '/api/auth/login', { email, password });
+      auth = res.data;
+      localStorage.setItem('kshort_auth', JSON.stringify(auth));
+      renderNav();
+      toast('success', `Welcome back, ${auth.username || auth.email} 👋`);
+      navigateTo('dashboard');
+    } catch(e) { showErr('loginError', e.message); }
+    finally { setLoad('loginBtn', false, 'Sign in'); }
+  }
+
+  async function handleRegister() {
+    const username = val('regUsername'), email = val('regEmail'), password = val('regPassword');
+    if (!username || !email || !password) { showErr('regError', 'Please fill all fields.'); return; }
+    if (password.length < 8) { showErr('regError', 'Password must be at least 8 characters.'); return; }
+    hideErr('regError');
+    setLoad('regBtn', true, 'Creating account...');
+    try {
+      const res = await api('POST', '/api/auth/register', { username, email, password });
+      auth = res.data;
+      localStorage.setItem('kshort_auth', JSON.stringify(auth));
+      renderNav();
+      toast('success', 'Account created — welcome! 🎉');
+      navigateTo('dashboard');
+    } catch(e) { showErr('regError', e.message); }
+    finally { setLoad('regBtn', false, 'Create account'); }
+  }
+
+  async function handleLogout() {
+    try {
+      if (auth?.refreshToken) await api('POST', '/api/auth/logout', { refreshToken: auth.refreshToken }, true).catch(() => {});
+    } finally {
+      auth = null;
+      localStorage.removeItem('kshort_auth');
+      renderNav();
+      toast('info', 'Signed out successfully.');
+      navigateTo('home');
+    }
+  }
+
+  // ──────────── OPTIONS TOGGLE ────────────
+  function toggleOptions() {
+    optionsOpen = !optionsOpen;
+    const opts = document.getElementById('homeOptions');
+    const btn = document.getElementById('optionsToggle');
+    if (optionsOpen) {
+      opts.style.display = 'flex';
+      btn.classList.add('active');
+    } else {
+      opts.style.display = 'none';
+      btn.classList.remove('active');
+    }
+  }
+
+  // ──────────── SHORTEN ────────────
+  async function handleShorten() {
+    if (!auth) { navigateTo('login'); return; }
+    const url = val('homeLongUrl');
+    if (!url) { showErr('homeError', 'Please enter a URL.'); return; }
+    if (!url.startsWith('http')) { showErr('homeError', 'URL must start with http:// or https://'); return; }
+    hideErr('homeError');
+    setLoad('shortenBtn', true, 'Shortening…');
+
+    const body = { originalUrl: url };
+    const alias = val('homeAlias'), expiry = val('homeExpiry');
+    if (alias) body.customAlias = alias;
+    if (expiry) body.expiresAt = new Date(expiry).toISOString();
+
+    try {
+      const res = await api('POST', '/api/urls', body, true);
+      const short = res.data.shortUrl || (BASE + '/r/' + res.data.shortCode);
+      document.getElementById('homeResultUrl').textContent = short;
+      document.getElementById('homeResult').classList.add('show');
+      toast('success', 'Link created!');
+    } catch(e) { showErr('homeError', e.message); }
+    finally { setLoad('shortenBtn', false, 'Shorten URL'); }
+  }
+
+  function copyResult() {
+    const url = document.getElementById('homeResultUrl').textContent;
+    navigator.clipboard.writeText(url).then(() => toast('success', 'Copied to clipboard!'));
+  }
+
+  // ──────────── DASHBOARD ────────────
+  async function loadDashboard(page = 0) {
+    currentPage = page;
+    const greet = document.getElementById('dashGreeting');
+    if (greet) greet.textContent = `Hello, ${auth?.username || auth?.email} — all your links below.`;
+
+    const container = document.getElementById('urlTableContainer');
+    container.innerHTML = `<div class="empty-state"><span class="spinner" style="width:30px;height:30px;border-width:3px"></span></div>`;
+    document.getElementById('pagination').style.display = 'none';
+
+    try {
+      const res = await api('GET', `/api/urls/my?page=${page}&size=10`, null, true);
+      const data = res.data;
+      const urls = data.content || [];
+      totalPages = data.totalPages || 0;
+
+      const now = Date.now();
+      const totalClicks = urls.reduce((s, u) => s + (u.clickCount || 0), 0);
+      const active = urls.filter(u => !u.expiresAt || new Date(u.expiresAt) > now).length;
+
+      animateNumber('statLinks', data.totalElements || urls.length);
+      animateNumber('statClicks', totalClicks);
+      animateNumber('statActive', active);
+
+      if (urls.length === 0) {
+        container.innerHTML = `
+                    <div class="empty-state">
+                        <span class="empty-icon">🔗</span>
+                        <h3>No links yet</h3>
+                        <p>Create your first short link to see it here.</p>
+                        <button class="btn btn-gold btn-sm shimmer-btn" onclick="openCreateModal()">Create link</button>
+                    </div>`;
+        return;
+      }
+
+      container.innerHTML = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Short link</th>
+                            <th>Original URL</th>
+                            <th>Clicks</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="urlTableBody"></tbody>
+                </table>`;
+
+      const tbody = document.getElementById('urlTableBody');
+      urls.forEach((u, i) => {
+        const expired = u.expiresAt && new Date(u.expiresAt) < now;
+        const shortUrl = u.shortUrl || `${BASE}/r/${u.shortCode}`;
+        const row = document.createElement('tr');
+        row.style.animation = `pageIn .3s ${i * .04}s both`;
+        row.innerHTML = `
+                    <td>
+                        <div>
+                            <span class="short-code" onclick="copyLink('${shortUrl}')" title="Click to copy">/${u.shortCode}</span>
+                            ${expired ? '<div><span class="expired-chip">expired</span></div>' : ''}
+                        </div>
+                    </td>
+                    <td><div class="orig-url" title="${u.originalUrl}">${u.originalUrl}</div></td>
+                    <td><span class="click-pill">↗ ${u.clickCount || 0}</span></td>
+                    <td><span class="time-text">${formatDate(u.createdAt)}</span></td>
+                    <td>
+                        <div class="action-row">
+                            <button class="btn btn-sm btn-subtle" onclick="copyLink('${shortUrl}')">Copy</button>
+                            <button class="btn btn-sm btn-outline" onclick="viewAnalytics('${u.shortCode}')">Analytics</button>
+                        </div>
+                    </td>`;
+        tbody.appendChild(row);
+      });
+
+      if (totalPages > 1) {
+        renderPagination(page, totalPages);
+        document.getElementById('pagination').style.display = 'flex';
+      }
+    } catch(e) {
+      container.innerHTML = `<div class="empty-state"><h3>Failed to load</h3><p>${e.message}</p><button class="btn btn-gold btn-sm" onclick="loadDashboard()">Retry</button></div>`;
+    }
+  }
+
+  function animateNumber(id, target) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const start = parseInt(el.textContent) || 0;
+    const dur = 600;
+    const startTime = performance.now();
+    function frame(now) {
+      const p = Math.min((now - startTime) / dur, 1);
+      const ease = 1 - Math.pow(1 - p, 3);
+      el.textContent = Math.round(start + (target - start) * ease);
+      if (p < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function renderPagination(current, total) {
+    const pg = document.getElementById('pagination');
+    let html = `<button class="pg-btn" onclick="loadDashboard(${current-1})" ${current===0?'disabled':''}>‹</button>`;
+    for (let i = 0; i < total; i++) {
+      if (total > 7 && Math.abs(i - current) > 2 && i !== 0 && i !== total-1) {
+        if (i === current - 3 || i === current + 3) html += `<span class="pg-btn" style="cursor:default">…</span>`;
+        continue;
+      }
+      html += `<button class="pg-btn ${i===current?'active':''}" onclick="loadDashboard(${i})">${i+1}</button>`;
+    }
+    html += `<button class="pg-btn" onclick="loadDashboard(${current+1})" ${current===total-1?'disabled':''}>›</button>`;
+    pg.innerHTML = html;
+  }
+
+  function copyLink(url) {
+    navigator.clipboard.writeText(url).then(() => toast('success', 'Copied!'));
+  }
+
+  // ──────────── CREATE MODAL ────────────
+  function openCreateModal() {
+    if (!auth) { navigateTo('login'); return; }
+    ['modalUrl','modalAlias','modalExpiry'].forEach(id => document.getElementById(id).value = '');
+    hideErr('modalError');
+    document.getElementById('createModal').classList.add('show');
+  }
+
+  async function handleCreate() {
+    const url = val('modalUrl');
+    if (!url) { showErr('modalError', 'URL is required.'); return; }
+    if (!url.startsWith('http')) { showErr('modalError', 'URL must start with http:// or https://'); return; }
+    hideErr('modalError');
+    setLoad('createBtn', true, 'Creating…');
+    const body = { originalUrl: url };
+    const alias = val('modalAlias'), expiry = val('modalExpiry');
+    if (alias) body.customAlias = alias;
+    if (expiry) body.expiresAt = new Date(expiry).toISOString();
+    try {
+      await api('POST', '/api/urls', body, true);
+      closeModal('createModal');
+      toast('success', 'Link created!');
+      loadDashboard(currentPage);
+    } catch(e) { showErr('modalError', e.message); }
+    finally { setLoad('createBtn', false, 'Create link'); }
+  }
+
+  // ──────────── ANALYTICS ────────────
+  async function viewAnalytics(shortCode) {
+    document.getElementById('analyticsTitle').textContent = `/${shortCode}`;
+    document.getElementById('analyticsUrl').textContent = '';
+    document.getElementById('analyticsBody').innerHTML = `<div class="empty-state"><span class="spinner" style="width:28px;height:28px;border-width:3px"></span></div>`;
+    document.getElementById('analyticsModal').classList.add('show');
+
+    try {
+      const res = await api('GET', `/api/analytics/${shortCode}`, null, true);
+      const d = res.data;
+      document.getElementById('analyticsUrl').textContent = d.originalUrl;
+
+      const browsers = {}, devices = {}, referers = {};
+      (d.analytics || []).forEach(a => {
+        browsers[a.browser || 'Unknown'] = (browsers[a.browser || 'Unknown'] || 0) + 1;
+        devices[a.device || 'UNKNOWN'] = (devices[a.device || 'UNKNOWN'] || 0) + 1;
+        referers[a.referer || 'Direct'] = (referers[a.referer || 'Direct'] || 0) + 1;
+      });
+
+      const topBrowser = Object.entries(browsers).sort((a,b)=>b[1]-a[1])[0];
+      const topDevice  = Object.entries(devices).sort((a,b)=>b[1]-a[1])[0];
+      const uniqueIPs  = new Set((d.analytics||[]).map(a=>a.ipAddress)).size;
+
+      let rows = '';
+      if (d.analytics?.length) {
+        rows = d.analytics.slice().reverse().slice(0,50).map(a => `
+                    <tr>
+                        <td style="font-family:var(--font-mono);font-size:.75rem;color:var(--text-3)">${a.ipAddress||'—'}</td>
+                        <td style="font-size:.82rem">${a.browser||'Unknown'}</td>
+                        <td><span class="device-badge ${a.device||'UNKNOWN'}">${deviceIcon(a.device)} ${a.device||'Unknown'}</span></td>
+                        <td style="font-size:.75rem;color:var(--text-3);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.referer||'Direct'}</td>
+                        <td class="time-text">${formatDate(a.createdAt)}</td>
+                    </tr>`).join('');
+      }
+
+      document.getElementById('analyticsBody').innerHTML = `
+                <div class="analytics-grid">
+                    <div class="analytics-meta-card">
+                        <div class="analytics-meta-label">Total clicks</div>
+                        <div class="analytics-meta-value" style="color:var(--success)">${d.totalClicks||0}</div>
+                    </div>
+                    <div class="analytics-meta-card">
+                        <div class="analytics-meta-label">Top browser</div>
+                        <div class="analytics-meta-value" style="font-size:1.3rem">${topBrowser?topBrowser[0]:'—'}</div>
+                    </div>
+                    <div class="analytics-meta-card">
+                        <div class="analytics-meta-label">Top device</div>
+                        <div class="analytics-meta-value" style="font-size:1.3rem">${topDevice?deviceIcon(topDevice[0])+' '+topDevice[0]:'—'}</div>
+                    </div>
+                    <div class="analytics-meta-card">
+                        <div class="analytics-meta-label">Unique IPs</div>
+                        <div class="analytics-meta-value" style="color:var(--gold)">${uniqueIPs}</div>
+                    </div>
+                </div>
+                ${rows ? `
+                <div class="analytics-table-wrap">
+                    <div class="analytics-table-label">Recent visits (last 50)</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>IP</th><th>Browser</th><th>Device</th><th>Referrer</th><th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>` : `<div class="empty-state"><span class="empty-icon">📊</span><h3>No visits yet</h3><p>Share your link to start tracking.</p></div>`}`;
+
+    } catch(e) {
+      document.getElementById('analyticsBody').innerHTML = `<div class="empty-state"><h3>Failed to load</h3><p>${e.message}</p></div>`;
+    }
+  }
+
+  function deviceIcon(d) {
+    return { MOBILE:'📱', DESKTOP:'🖥', TABLET:'📲', UNKNOWN:'❓' }[d] || '❓';
+  }
+
+  // ──────────── MODALS ────────────
+  function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+  document.addEventListener('click', e => {
+    ['createModal','analyticsModal'].forEach(id => {
+      const el = document.getElementById(id);
+      if (e.target === el) closeModal(id);
+    });
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') ['createModal','analyticsModal'].forEach(closeModal);
+  });
+
+  // ──────────── HELPERS ────────────
+  function val(id) { return document.getElementById(id)?.value?.trim() || ''; }
+
+  function showErr(id, msg) {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = msg; el.classList.add('show'); }
+  }
+
+  function hideErr(id) {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = ''; el.classList.remove('show'); }
+  }
+
+  function setLoad(id, loading, text) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.disabled = loading;
+    btn.innerHTML = loading ? `<span class="spinner"></span> ${text}` : text;
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' })
+            + ' ' + d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+  }
+
+  function toast(type, msg) {
+    const icons = { success: '✓', error: '✕', info: '◆' };
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.innerHTML = `<span class="toast-icon">${icons[type]||'◆'}</span><span>${msg}</span>`;
+    document.getElementById('toasts').appendChild(el);
+    setTimeout(() => {
+      el.classList.add('out');
+      setTimeout(() => el.remove(), 300);
+    }, 3200);
+  }
+
+  // ──────────── HASH CHANGE ────────────
+  window.addEventListener('hashchange', () => {
+    const page = location.hash.replace('#','') || 'home';
+    navigateTo(page);
+  });
+
+  init();
+</script>
+</body>
+</html>
