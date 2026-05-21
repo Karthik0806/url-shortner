@@ -13,6 +13,7 @@ src/main/resources/application-dev.yaml
 src/main/resources/application-local.properties
 src/main/resources/application-secret.properties
 
+
 # Ignore all environment-specific configs
 src/main/resources/application-*.properties
 
@@ -21,6 +22,7 @@ src/main/resources/application-*.properties
 
 ### Static Files ###
 src/main/resources/static/index.html
+src/main/resources/static/index2.html
 
 ### Environment Files ###
 .env

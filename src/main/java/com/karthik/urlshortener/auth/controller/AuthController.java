@@ -1,10 +1,8 @@
 package com.karthik.urlshortener.auth.controller;
 
-import com.karthik.urlshortener.auth.dto.AuthResponse;
-import com.karthik.urlshortener.auth.dto.LoginRequest;
-import com.karthik.urlshortener.auth.dto.RefreshTokenRequest;
-import com.karthik.urlshortener.auth.dto.RegisterRequest;
+import com.karthik.urlshortener.auth.dto.*;
 import com.karthik.urlshortener.auth.service.AuthService;
+import com.karthik.urlshortener.auth.service.GoogleAuthService;
 import com.karthik.urlshortener.common.dto.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final GoogleAuthService googleAuthService;
 
     @PostMapping("/register")
     public ApiResponse<AuthResponse> register(
@@ -63,6 +62,21 @@ public class AuthController {
                 .success(true)
                 .message("Logout successful")
                 .data("Logged out successfully")
+                .build();
+    }
+    @PostMapping("/google")
+    public ApiResponse<AuthResponse> googleLogin(
+            @Valid @RequestBody GoogleAuthRequest request
+    ) {
+
+        return ApiResponse.<AuthResponse>builder()
+                .success(true)
+                .message("Google login successful")
+                .data(
+                        googleAuthService.authenticate(
+                                request.getIdToken()
+                        )
+                )
                 .build();
     }
 }

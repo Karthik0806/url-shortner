@@ -328,7 +328,7 @@ public class UrlService {
                                         )
 
                                         .shortUrl(
-                                                "https://go.karthiknarravula.dev/r/"
+                                                "https://knurls.me/r/"
                                                         + url.getShortCode()
                                         )
 
