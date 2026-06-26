@@ -7,7 +7,7 @@
 
 <br/>
 
-**Production-grade URL shortener with custom aliases, click analytics, Redis caching, and JWT + Google OAuth2 authentication.**
+**REAL-Time URL shortener with custom aliases, click analytics, Redis caching, and JWT + Google OAuth2 authentication.**
 
 <br/>
 
