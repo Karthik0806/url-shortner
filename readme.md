@@ -96,7 +96,7 @@
 | **Data** | PostgreSQL (AWS RDS) · Redis (caching + rate limiting) |
 | **Observability** | Spring Actuator · Micrometer · Prometheus |
 | **DevOps / Cloud** | Docker · Docker Hub · AWS EC2 · AWS RDS · Nginx · GitHub Actions |
-| **Docs** | springdoc-openapi (Swagger UI) |
+| **Docs** | Custom API Documentation · OpenAPI 3 · Swagger UI |
 
 ---
 
@@ -230,7 +230,7 @@ GOOGLE_CLIENT_ID=your_google_client_id
 ADMIN_EMAIL=admin@example.com
 ADMIN_PASSWORD=change_me
 
-APP_BASE_SHORT_URL=https://knursl.me/r/
+APP_BASE_SHORT_URL=https://knurls.me/r/
 ```
 
 ### 3 · Run the Application
@@ -250,7 +250,7 @@ APP_BASE_SHORT_URL=https://knursl.me/r/
 ```bash
 docker buildx build \
   --platform linux/amd64 \
-  -t karthi2005/knursl-backend:latest \
+  -t karthi2005/knurls-backend:latest \
   --push .
 ```
 
@@ -308,7 +308,7 @@ Pull & Restart Container
 
 ## 📚 What I Learned
 
-Building knursl.me gave me hands-on experience across backend and cloud engineering:
+Building knurls.me gave me hands-on experience across backend and cloud engineering:
 
 - **Caching strategy** — Implementing a cache-aside pattern with Redis to keep hot redirects fast while staying consistent with PostgreSQL
 - **Rate limiting** — Designing an IP-based sliding-window limiter backed by Redis counters
