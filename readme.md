@@ -2,7 +2,7 @@
 
 <br/>
 
-# knursl.me 🔗
+# knurls.me 🔗
 ### Scalable URL Shortener
 
 <br/>
@@ -11,8 +11,8 @@
 
 <br/>
 
-[![Live Demo](https://img.shields.io/badge/%F0%9F%9A%80%20Live%20Demo-knursl.me-C8933A?style=for-the-badge&labelColor=0d0c0a)](https://knursl.me)
-[![API Docs](https://img.shields.io/badge/%F0%9F%93%96%20API%20Docs-Swagger%20UI-2ea44f?style=for-the-badge&labelColor=0d0c0a)](https://api.knurlos.me/swagger-ui/index.html)
+[![Live Demo](https://img.shields.io/badge/%F0%9F%9A%80%20Live%20Demo-knurls.me-C8933A?style=for-the-badge&labelColor=0d0c0a)](https://knurls.me)
+[![API Docs](https://img.shields.io/badge/%F0%9F%93%96%20API%20Docs-Swagger%20UI-2ea44f?style=for-the-badge&labelColor=0d0c0a)](https://api.knurls.me/swagger-ui/index.html)
 [![Portfolio](https://img.shields.io/badge/%F0%9F%8C%90%20Portfolio-karthiknarravula.dev-9b59b6?style=for-the-badge&labelColor=0d0c0a)](https://karthiknarravula.dev)
 
 <br/>
@@ -36,10 +36,11 @@
 
 | Resource | URL |
 |:---|:---|
-| 🌐 App | [knursl.me](https://knursl.me) |
-| ⚙️ Backend API | [api.knurlos.me](https://api.knurlos.me) |
-| 📖 Swagger UI | [/swagger-ui/index.html](https://api.knurlos.me/swagger-ui/index.html) |
-| 📄 OpenAPI JSON | [/v3/api-docs](https://api.knurlos.me/v3/api-docs) |
+| 🌐 App | [knurls.me](https://knurls.me) |
+| ⚙️ Backend API | [api.knurls.me](https://api.knurls.me) |
+| 📖 Custom API Documentation | [doc.knurls.me](https://doc.knurls.me) |
+| 📖 Swagger UI | [/swagger-ui/index.html](https://api.knurls.me/swagger-ui/index.html) |
+| 📄 OpenAPI JSON | [/v3/api-docs](https://api.knurls.me/v3/api-docs) |
 
 ---
 
@@ -79,7 +80,7 @@
 - AWS RDS PostgreSQL database
 - Nginx reverse proxy with HTTPS
 - GitHub Actions CI/CD pipeline
-- Swagger/OpenAPI 3 documentation
+- Swagger/OpenAPI 3 and custom documentation
 - Actuator + Micrometer/Prometheus metrics
 
 </td>
