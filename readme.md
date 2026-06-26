@@ -12,7 +12,7 @@
 <br/>
 
 [![Live Demo](https://img.shields.io/badge/%F0%9F%9A%80%20Live%20Demo-knurls.me-C8933A?style=for-the-badge&labelColor=0d0c0a)](https://knurls.me)
-[![API Docs](https://img.shields.io/badge/%F0%9F%93%96%20API%20Docs-Swagger%20UI-2ea44f?style=for-the-badge&labelColor=0d0c0a)](https://api.knurls.me/swagger-ui/index.html)
+[![API Docs](https://img.shields.io/badge/%F0%9F%93%96%20API%20Docs-Developer%20Portal-2ea44f?style=for-the-badge&labelColor=0d0c0a)](https://doc.knurls.me)
 [![Portfolio](https://img.shields.io/badge/%F0%9F%8C%90%20Portfolio-karthiknarravula.dev-9b59b6?style=for-the-badge&labelColor=0d0c0a)](https://karthiknarravula.dev)
 
 <br/>
