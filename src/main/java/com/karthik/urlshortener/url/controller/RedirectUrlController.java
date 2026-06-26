@@ -23,27 +23,15 @@ public class RedirectUrlController {
     private final RateLimitService rateLimitService;
 
     @GetMapping("/r/{shortCode}")
-    public ResponseEntity<Void> redirect(
-            @PathVariable String shortCode,
-            HttpServletRequest request) {
-
+    public ResponseEntity<Void> redirect(@PathVariable String shortCode, HttpServletRequest request) {
         String ipAddress = request.getRemoteAddr();
-
         boolean allowed = rateLimitService.isAllowed(ipAddress);
-
         if (!allowed) {
-            throw new RateLimitExceededException(
-                    "Too many requests. Please try again later");
+            throw new RateLimitExceededException("Too many requests. Please try again later");
         }
-
         Url url = urlService.getOriginalUrl(shortCode);
-
         analyticsService.saveAnalytics(url, request);
-        log.info(
-                "Redirecting shortCode: {}",
-                shortCode
-        );
-
+        log.info("Redirecting shortCode: {}", shortCode);
         return ResponseEntity.status(302)
                 .header("Location", url.getOriginalUrl())
                 .build();

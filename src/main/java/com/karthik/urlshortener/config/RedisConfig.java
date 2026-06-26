@@ -12,47 +12,17 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration
 public class RedisConfig {
-
     @Bean
-
     public RedisTemplate<String, CachedUrl>
-
-    redisTemplate(
-
-            RedisConnectionFactory connectionFactory
-
-    ) {
-
+    redisTemplate(RedisConnectionFactory connectionFactory) {
         RedisTemplate<String, CachedUrl> template =
-
                 new RedisTemplate<>();
-
-        template.setConnectionFactory(
-
-                connectionFactory
-
-        );
-
-        Jackson2JsonRedisSerializer<CachedUrl> serializer =
-
-                new Jackson2JsonRedisSerializer<>(
-
-                        CachedUrl.class
-
-                );
-
-        template.setKeySerializer(
-
-                new StringRedisSerializer()
-
-        );
-
+        template.setConnectionFactory(connectionFactory);
+        Jackson2JsonRedisSerializer<CachedUrl> serializer = new Jackson2JsonRedisSerializer<>(CachedUrl.class);
+        template.setKeySerializer(new StringRedisSerializer());
         template.setValueSerializer(serializer);
-
         template.afterPropertiesSet();
-
         return template;
-
     }
 
 }

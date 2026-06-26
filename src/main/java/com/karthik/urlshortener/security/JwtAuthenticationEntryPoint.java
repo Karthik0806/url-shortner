@@ -15,36 +15,18 @@ import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
-public class JwtAuthenticationEntryPoint
-        implements AuthenticationEntryPoint {
-
+public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
     private final ObjectMapper objectMapper;
-
     @Override
-    public void commence(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            AuthenticationException authException
-    ) throws IOException {
-
-        response.setStatus(
-                HttpServletResponse.SC_UNAUTHORIZED
-        );
-
-        response.setContentType(
-                MediaType.APPLICATION_JSON_VALUE
-        );
-
-        Map<String, Object> body =
-                Map.of(
+    public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        Map<String, Object> body = Map.of(
                         "success", false,
                         "message", "Unauthorized",
                         "timestamp", Instant.now()
                 );
 
-        objectMapper.writeValue(
-                response.getOutputStream(),
-                body
-        );
+        objectMapper.writeValue(response.getOutputStream(), body);
     }
 }

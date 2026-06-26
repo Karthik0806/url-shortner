@@ -19,18 +19,11 @@ public interface UrlRepo extends JpaRepository<Url,Long> {
 
     Optional<Url> findByShortCode(String shortCode);
     boolean existsByShortCode(String shortCode);
-
     Optional<Url> findByCustomAlias(String customAlias);
     boolean existsByCustomAlias(String customAlias);
-
     Optional<Url> findByOriginalUrl(String originalUrl);
-    Page<Url> findByUserOrderByCreatedAtDesc(
-            User user,
-            Pageable pageable
-    );
-
+    Page<Url> findByUserOrderByCreatedAtDesc(User user, Pageable pageable);
     Optional<Url> findByOriginalUrlAndUser(String originalUrl,User user);
-
     @Transactional
     @Modifying
     @Query("""
@@ -38,11 +31,6 @@ public interface UrlRepo extends JpaRepository<Url,Long> {
        SET u.clickCount = u.clickCount + 1
        WHERE u.id = :urlId
        """)
-    void incrementClickCount(
-            @Param("urlId") Long urlId
-    );
-    Optional<Url> findByShortCodeAndUserId(
-            String shortCode,
-            Long userId
-    );
+    void incrementClickCount(@Param("urlId") Long urlId);
+    Optional<Url> findByShortCodeAndUserId(String shortCode, Long userId);
 }

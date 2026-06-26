@@ -1,12 +1,7 @@
 package com.karthik.urlshortener.common.exception;
 
-public class ForbiddenException
-        extends RuntimeException {
-
-    public ForbiddenException(
-            String message
-    ) {
-
+public class ForbiddenException extends RuntimeException {
+    public ForbiddenException(String message) {
         super(message);
     }
 }

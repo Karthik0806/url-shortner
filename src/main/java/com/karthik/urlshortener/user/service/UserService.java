@@ -14,27 +14,16 @@ import org.springframework.stereotype.Service;
 public class UserService {
 
     private final UserRepo userRepo;
-
-    public CustomUserDetails
-    getAuthenticatedUser() {
-
-        Authentication authentication =
-                SecurityContextHolder
+    public CustomUserDetails getAuthenticatedUser() {
+        Authentication authentication = SecurityContextHolder
                         .getContext()
                         .getAuthentication();
-
-        return (CustomUserDetails)
-                authentication.getPrincipal();
+        return (CustomUserDetails) authentication.getPrincipal();
     }
 
     public User getCurrentUserEntity() {
-
-        CustomUserDetails currentUser =
-                getAuthenticatedUser();
-
-        return userRepo.findById(
-                currentUser.getId()
-        ).orElseThrow(() ->
+        CustomUserDetails currentUser = getAuthenticatedUser();
+        return userRepo.findById(currentUser.getId()).orElseThrow(() ->
                 new UserNotFoundException(
                         "User not found"
                 )

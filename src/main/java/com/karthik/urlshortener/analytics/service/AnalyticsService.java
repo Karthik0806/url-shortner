@@ -22,184 +22,81 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class AnalyticsService {
-
     private final AnalyticsRepo analyticsRepo;
-
     private final UrlRepo urlRepo;
-
     private final UserService userService;
-
-    public void saveAnalytics(
-            Url url,
-            HttpServletRequest request
-    ) {
-
-        Analytics analytics = Analytics.builder()
-
-                .url(url)
-
-                .ipAddress(
-                        extractIpAddress(request)
-                )
-
-                .browser(
-                        extractBrowser(
-                                request.getHeader("User-Agent")
-                        )
-                )
-
-                .device(
-                        extractDevice(
-                                request.getHeader("User-Agent")
-                        )
-                )
-
-                .referer(
-                        request.getHeader("Referer")
-                )
-
+    public void saveAnalytics(Url url, HttpServletRequest request){
+        Analytics analytics = Analytics.builder().url(url)
+                .ipAddress(extractIpAddress(request))
+                .browser(extractBrowser(request.getHeader("User-Agent")))
+                .device(extractDevice(request.getHeader("User-Agent")))
+                .referer(request.getHeader("Referer"))
                 .build();
 
         analyticsRepo.save(analytics);
-
-        log.info(
-                "Analytics saved for shortCode: {}",
-                url.getShortCode()
-        );
+        log.info("Analytics saved for shortCode: {}", url.getShortCode());
     }
 
-    public AnalyticsSummaryResponse getAnalytics(
-            Url url
-    ) {
+    public AnalyticsSummaryResponse getAnalytics(Url url) {
 
-
-        // STEP 3: Fetch analytics
         List<Analytics> analyticsList =
                 analyticsRepo.findByUrl(url);
-
-        // STEP 4: Build response
-        List<AnalyticsResponse> analyticsResponses =
-                analyticsList
+        List<AnalyticsResponse> analyticsResponses = analyticsList
                         .stream()
                         .map(analytics ->
                                 AnalyticsResponse.builder()
-
-                                        .ipAddress(
-                                                analytics.getIpAddress()
-                                        )
-
-                                        .browser(
-                                                analytics.getBrowser()
-                                        )
-
-                                        .device(
-                                                analytics.getDevice()
-                                        )
-
-                                        .referer(
-                                                analytics.getReferer()
-                                        )
-
-                                        .createdAt(
-                                                analytics.getCreatedAt()
-                                        )
-
-                                        .build()
-                        )
-                        .toList();
+                                        .ipAddress(analytics.getIpAddress())
+                                        .browser(analytics.getBrowser())
+                                        .device(analytics.getDevice())
+                                        .referer(analytics.getReferer())
+                                        .createdAt(analytics.getCreatedAt())
+                                        .build())
+                .toList();
 
         return AnalyticsSummaryResponse.builder()
-
-                .shortCode(
-                        url.getShortCode()
-                )
-
-                .originalUrl(
-                        url.getOriginalUrl()
-                )
-
-                .totalClicks(
-                        url.getClickCount()
-                )
-
-                .analytics(
-                        analyticsResponses
-                )
-
+                .shortCode(url.getShortCode())
+                .originalUrl(url.getOriginalUrl())
+                .totalClicks(url.getClickCount())
+                .analytics(analyticsResponses)
                 .build();
     }
 
-    private String extractIpAddress(
-            HttpServletRequest request
-    ) {
-
-        String forwardedFor =
-                request.getHeader(
-                        "X-Forwarded-For"
-                );
-
-        if (forwardedFor != null &&
-                !forwardedFor.isBlank()) {
-
-            return forwardedFor
-                    .split(",")[0]
-                    .trim();
+    private String extractIpAddress(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
         }
-
         return request.getRemoteAddr();
     }
 
-    private String extractBrowser(
-            String userAgent
-    ) {
-
+    private String extractBrowser(String userAgent) {
         if (userAgent == null) {
-
             return "Unknown";
         }
-
         if (userAgent.contains("Chrome")) {
-
             return "Chrome";
         }
-
         if (userAgent.contains("Firefox")) {
-
             return "Firefox";
         }
-
         if (userAgent.contains("Safari")) {
-
             return "Safari";
         }
-
         if (userAgent.contains("Edge")) {
-
             return "Edge";
         }
-
         return "Unknown";
     }
 
-    private DeviceType extractDevice(
-            String userAgent
-    ) {
-
+    private DeviceType extractDevice(String userAgent) {
         if (userAgent == null) {
-
             return DeviceType.UNKNOWN;
         }
-
-        String lower =
-                userAgent.toLowerCase();
-
+        String lower = userAgent.toLowerCase();
         if (lower.contains("mobile")) {
-
             return DeviceType.MOBILE;
         }
-
         if (lower.contains("tablet")) {
-
             return DeviceType.TABLET;
         }
 

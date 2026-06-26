@@ -16,30 +16,18 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/urls")
 @RequiredArgsConstructor
 public class UrlController {
-
     private final UrlService urlService;
-
     @GetMapping("/my")
-    public ApiResponse<PaginatedResponse<UserUrlResponse>> getMyUrls(
-
-            @RequestParam(defaultValue = "0") int page,
-
-            @RequestParam(defaultValue = "10") int size) {
-
+    public ApiResponse<PaginatedResponse<UserUrlResponse>> getMyUrls(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "10") int size) {
         return ApiResponse.<PaginatedResponse<UserUrlResponse>>builder()
-
                 .success(true)
-
                 .message("URLs fetched successfully")
-
                 .data(urlService.getMyUrls(page, size))
-
                 .build();
     }
 
     @PostMapping
     public ApiResponse<ShortUrlResponse> createShortUrl(@Valid @RequestBody CreateShortUrlRequest request) {
-
         return ApiResponse.<ShortUrlResponse>builder().success(true).message("Short URL created successfully").data(urlService.createShortUrl(request)).build();
     }
 }

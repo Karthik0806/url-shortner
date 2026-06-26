@@ -28,80 +28,40 @@ public class JwtFilter extends OncePerRequestFilter {
     private final CustomUserDetailsService userDetailsService;
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
-    ) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        String authHeader = request.getHeader("Authorization");
 
-        String authHeader =
-                request.getHeader("Authorization");
-
-        // STEP 1: Check header
-        if (authHeader == null ||
-                !authHeader.startsWith("Bearer ")) {
-
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
-
             return;
         }
 
-        String token =
-                authHeader.substring(7);
-
+        String token = authHeader.substring(7);
         try {
 
-            // STEP 2: Validate token
             if (!jwtService.isTokenValid(token)) {
-
-                throw new JwtException(
-                        "Invalid JWT token"
-                );
+                throw new JwtException("Invalid JWT token");
             }
 
-            // STEP 3: Extract email
-            String email =
-                    jwtService.extractEmail(token);
+            String email = jwtService.extractEmail(token);
 
-            // STEP 4: Authenticate user
-            if (email != null &&
-                    SecurityContextHolder
-                            .getContext()
-                            .getAuthentication() == null) {
-
-                UserDetails userDetails =
-                        userDetailsService
-                                .loadUserByUsername(email);
-
+            if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(
                                 userDetails,
                                 null,
                                 userDetails.getAuthorities()
                         );
-
-                authToken.setDetails(
-                        new WebAuthenticationDetailsSource()
-                                .buildDetails(request)
-                );
-
-                SecurityContextHolder
-                        .getContext()
-                        .setAuthentication(authToken);
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
             }
 
         } catch (Exception ex) {
-
-            log.error(
-                    "JWT authentication failed: {}",
-                    ex.getMessage()
-            );
-
+            log.error("JWT authentication failed: {}", ex.getMessage());
             SecurityContextHolder.clearContext();
-
             throw ex;
         }
-
         filterChain.doFilter(request, response);
     }
 }

@@ -72,11 +72,7 @@ public class AuthController {
         return ApiResponse.<AuthResponse>builder()
                 .success(true)
                 .message("Google login successful")
-                .data(
-                        googleAuthService.authenticate(
-                                request.getIdToken()
-                        )
-                )
+                .data(googleAuthService.authenticate(request.getIdToken()))
                 .build();
     }
 }

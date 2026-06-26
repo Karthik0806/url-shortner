@@ -17,95 +17,30 @@ public class OpenAPIConfig {
 
     @Bean
     public OpenAPI customOpenAPI() {
-
-        final String securitySchemeName =
-                "bearerAuth";
-
-        return new OpenAPI()
-
-                .info(
-                        new Info()
-
-                                .title(
-                                        "KShort API"
-                                )
-
+        final String securitySchemeName = "bearerAuth";
+        return new OpenAPI().info(new Info()
+                                .title("KShort API")
                                 .version("1.0.0")
-
                                 .description(
                                         """
                                         Production-grade scalable URL shortener API
                                         built with Spring Boot, PostgreSQL, Redis,
                                         JWT authentication, analytics, and rate limiting.
                                         """
-                                )
+                                ).contact(new Contact().name("Karthik Narravula")
+                                        .url("https://karthiknarravula.dev")))
+                .servers(List.of(new Server()
+                                        .url("http://localhost:8080")
+                                        .description("Local Development"),
+                                new Server().url("https://shortner.karthiknarravula.dev")
+                                        .description("Production"))).addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
 
-                                .contact(
-                                        new Contact()
-
-                                                .name(
-                                                        "Karthik Narravula"
-                                                )
-
-                                                .url(
-                                                        "https://karthiknarravula.dev"
-                                                )
-                                )
-                )
-
-                .servers(
-                        List.of(
-
-                                new Server()
-
-                                        .url(
-                                                "http://localhost:8080"
-                                        )
-
-                                        .description(
-                                                "Local Development"
-                                        ),
-
-                                new Server()
-
-                                        .url(
-                                                "https://shortner.karthiknarravula.dev"
-                                        )
-
-                                        .description(
-                                                "Production"
-                                        )
-                        )
-                )
-
-                .addSecurityItem(
-                        new SecurityRequirement()
-                                .addList(
-                                        securitySchemeName
-                                )
-                )
-
-                .components(
-                        new Components()
-
-                                .addSecuritySchemes(
-                                        securitySchemeName,
-
+                .components(new Components().addSecuritySchemes(securitySchemeName,
                                         new SecurityScheme()
-
-                                                .name(
-                                                        securitySchemeName
-                                                )
-
-                                                .type(
-                                                        SecurityScheme.Type.HTTP
-                                                )
-
+                                                .name(securitySchemeName)
+                                                .type(SecurityScheme.Type.HTTP)
                                                 .scheme("bearer")
-
-                                                .bearerFormat(
-                                                        "JWT"
-                                                )
+                                                .bearerFormat("JWT")
                                 )
                 );
     }

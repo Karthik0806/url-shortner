@@ -25,62 +25,37 @@ public class GoogleAuthService {
     private final UserRepo userRepo;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
-
     @Value("${google.client-id}")
     private String googleClientId;
 
     public AuthResponse authenticate(String idTokenString) {
-
         try {
-
-            GoogleIdTokenVerifier verifier =
-                    new GoogleIdTokenVerifier.Builder(
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(
                             new NetHttpTransport(),
-                            GsonFactory.getDefaultInstance()
-                    )
-                            .setAudience(
-                                    Collections.singletonList(googleClientId)
-                            )
+                            GsonFactory.getDefaultInstance())
+                            .setAudience(Collections.singletonList(googleClientId))
                             .build();
 
-            GoogleIdToken idToken =
-                    verifier.verify(idTokenString);
-
+            GoogleIdToken idToken = verifier.verify(idTokenString);
             if (idToken == null) {
-                throw new InvalidTokenException(
-                        "Invalid Google token"
-                );
+                throw new InvalidTokenException("Invalid Google token");
             }
-
-            GoogleIdToken.Payload payload =
-                    idToken.getPayload();
-
+            GoogleIdToken.Payload payload = idToken.getPayload();
             String email = payload.getEmail();
-            String username =
-                    (String) payload.get("name");
-
-            User user = userRepo
-                    .findByEmail(email)
-                    .orElseGet(() -> {
-
+            String username = (String) payload.get("name");
+            User user = userRepo.findByEmail(email).orElseGet(() -> {
                         User newUser = User.builder()
                                 .email(email)
                                 .username(username)
-                                .password(
-                                        UUID.randomUUID().toString()
-                                )
+                                .password(UUID.randomUUID().toString())
                                 .role(Role.USER)
                                 .build();
 
                         return userRepo.save(newUser);
                     });
 
-            String accessToken =
-                    jwtService.generateAccessToken(email);
-
-            RefreshToken refreshToken =
-                    refreshTokenService
-                            .createRefreshToken(user);
+            String accessToken = jwtService.generateAccessToken(email);
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 
             return AuthResponse.builder()
                     .accessToken(accessToken)
@@ -88,12 +63,8 @@ public class GoogleAuthService {
                     .email(user.getEmail())
                     .username(user.getUsername())
                     .build();
-
         } catch (Exception e) {
-
-            throw new InvalidTokenException(
-                    "Google authentication failed"
-            );
+            throw new InvalidTokenException("Google authentication failed");
         }
     }
 }
