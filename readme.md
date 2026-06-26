@@ -39,7 +39,6 @@
 | 🌐 App | [knurls.me](https://knurls.me) |
 | ⚙️ Backend API | [api.knurls.me](https://api.knurls.me) |
 | 📖 Custom API Documentation | [doc.knurls.me](https://doc.knurls.me) |
-| 📖 Swagger UI | [/swagger-ui/index.html](https://api.knurls.me/swagger-ui/index.html) |
 | 📄 OpenAPI JSON | [/v3/api-docs](https://api.knurls.me/v3/api-docs) |
 
 ---
