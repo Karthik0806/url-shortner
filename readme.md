@@ -7,7 +7,7 @@
 
 <br/>
 
-**REAL-Time URL shortener with custom aliases, click analytics, Redis caching, and JWT + Google OAuth2 authentication.**
+**Scalable URL shortener with custom aliases, click analytics, Redis caching, and JWT + Google OAuth2 authentication.**
 
 <br/>
 
