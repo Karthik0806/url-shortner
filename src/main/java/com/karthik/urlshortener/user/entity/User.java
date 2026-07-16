@@ -33,6 +33,7 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
+
     private Instant createdAt;
 
     @OneToMany(mappedBy = "user",cascade = CascadeType.ALL)

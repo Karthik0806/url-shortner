@@ -27,6 +27,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
 
     public AuthResponse register(RegisterRequest request){
+
         if (userRepo.existsByEmail(request.getEmail())){
             throw new UserAlreadyExistsException("Email already exists");
         }

@@ -2,7 +2,9 @@ package com.karthik.urlshortener.url.service;
 
 import com.karthik.urlshortener.common.config.AppProperties;
 import com.karthik.urlshortener.common.exception.*;
+import com.karthik.urlshortener.common.security.SafeBrowsingService;
 import com.karthik.urlshortener.common.util.Base62Encoder;
+import com.karthik.urlshortener.common.validation.UrlValidationService;
 import com.karthik.urlshortener.security.entity.CustomUserDetails;
 import com.karthik.urlshortener.url.dto.*;
 import com.karthik.urlshortener.url.entity.Url;
@@ -42,10 +44,15 @@ public class UrlService {
     private final RedisTemplate<String, CachedUrl> redisTemplate;
     private final AppProperties appProperties;
     private final UserRepo userRepo;
+    private final UrlValidationService urlValidationService;
+    private final SafeBrowsingService safeBrowsingService;
     @Transactional
     public ShortUrlResponse createShortUrl(CreateShortUrlRequest request) {
 
         final User user = userService.getCurrentUserEntity();
+        urlValidationService.validate(request.getOriginalUrl());
+
+        safeBrowsingService.check(request.getOriginalUrl());
         log.info("Creating short URL for user: {}", user.getEmail());
         String customAlias = null;
         if (request.getCustomAlias() != null && !request.getCustomAlias().isBlank()) {

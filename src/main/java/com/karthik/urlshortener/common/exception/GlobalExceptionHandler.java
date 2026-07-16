@@ -151,4 +151,19 @@ public class GlobalExceptionHandler {
                 .message("Something went wrong")
                 .build());
     }
+    @ExceptionHandler(InvalidUrlException.class)
+    public ResponseEntity<ApiResponse<Void>> handleInvalidUrl(InvalidUrlException ex) {
+        return ResponseEntity.badRequest().body(
+                        ApiResponse.<Void>builder()
+                                .success(false)
+                                .message(ex.getMessage())
+                                .build());
+    }
+    @ExceptionHandler(UnsafeUrlException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUnsafeUrl(UnsafeUrlException ex){
+        return ResponseEntity.badRequest().body(ApiResponse.<Void>builder()
+                .success(false)
+                .message(ex.getMessage())
+                .build());
+    }
 }
